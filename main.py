@@ -241,7 +241,7 @@ def main():
                     with col3:
                         if st.button("Rerun Request", key=f"rerun_{i}"):
                             st.session_state.rerun_command = entry['curl_command']
-                            st.experimental_rerun()
+                            st.rerun()
                     with col4:
                         if st.session_state.compare_mode:
                             if st.button("Select for Comparison", key=f"compare_{i}"):
@@ -249,7 +249,7 @@ def main():
                                     st.session_state.compare_selections.append(entry['id'])
                                     if len(st.session_state.compare_selections) > 2:
                                         st.session_state.compare_selections.pop(0)
-                                    st.experimental_rerun()
+                                    st.rerun()
                     
                     # Show comparison if two items are selected
                     if (st.session_state.compare_mode and 
