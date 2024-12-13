@@ -18,16 +18,25 @@ if 'request_history' not in st.session_state:
     st.session_state.request_history = []
 
 def save_to_history(curl_command, request_info, response_info):
-    """Save the request and response information to history."""
+    """Save the request and response information to history with enhanced metadata."""
     history_entry = {
+        'id': len(st.session_state.request_history),
         'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'curl_command': curl_command,
         'request_info': request_info,
         'response_info': response_info,
         'status_code': response_info['status_code'],
-        'execution_time': response_info['metadata']['timing']['total_time']
+        'execution_time': response_info['metadata']['timing']['total_time'],
+        'success': 200 <= response_info['status_code'] < 300,
+        'endpoint': request_info['url_analysis']['path'],
+        'method': request_info['method'],
+        'tags': []  # For future use - allowing users to tag requests
     }
     st.session_state.request_history.insert(0, history_entry)  # Add to beginning of list
+    
+    # Keep only the last 50 requests to manage memory
+    if len(st.session_state.request_history) > 50:
+        st.session_state.request_history = st.session_state.request_history[:50]
 
 def main():
     st.title("🔍 Curl Command Analyzer")
@@ -182,14 +191,49 @@ def main():
         if not st.session_state.request_history:
             st.info("No requests have been made yet. Your request history will appear here.")
         else:
-            for i, entry in enumerate(st.session_state.request_history):
+            # Add history controls
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                search = st.text_input("🔍 Filter history", placeholder="Search by endpoint, status code, or method...")
+            with col2:
+                if st.button("Export History", key="export"):
+                    st.download_button(
+                        "Download JSON",
+                        data=json.dumps(st.session_state.request_history, indent=2),
+                        file_name="curl_history.json",
+                        mime="application/json"
+                    )
+            
+            # Initialize comparison mode if not exists
+            if 'compare_mode' not in st.session_state:
+                st.session_state.compare_mode = False
+                st.session_state.compare_selections = []
+            
+            # Add comparison toggle
+            st.session_state.compare_mode = st.checkbox(
+                "Enable Comparison Mode",
+                value=st.session_state.compare_mode,
+                help="Select two requests to compare their details"
+            )
+            
+            filtered_history = st.session_state.request_history
+            if search:
+                filtered_history = [
+                    entry for entry in st.session_state.request_history
+                    if (search.lower() in entry['endpoint'].lower() or
+                        search in str(entry['status_code']) or
+                        search.lower() in entry['method'].lower())
+                ]
+            
+            for i, entry in enumerate(filtered_history):
+                success_icon = "✅" if entry['success'] else "❌"
                 with st.expander(
-                    f"[{entry['status_code']}] {entry['timestamp']} - {entry['curl_command'][:50]}..."
+                    f"{success_icon} [{entry['method']}] {entry['endpoint']} - {entry['timestamp']} ({entry['status_code']})"
                 ):
                     st.text("Curl Command:")
                     st.code(entry['curl_command'])
                     
-                    col1, col2, col3 = st.columns(3)
+                    col1, col2, col3, col4 = st.columns(4)
                     with col1:
                         st.metric("Status Code", entry['status_code'])
                     with col2:
@@ -198,12 +242,48 @@ def main():
                         if st.button("Rerun Request", key=f"rerun_{i}"):
                             st.session_state.rerun_command = entry['curl_command']
                             st.experimental_rerun()
+                    with col4:
+                        if st.session_state.compare_mode:
+                            if st.button("Select for Comparison", key=f"compare_{i}"):
+                                if entry['id'] not in st.session_state.compare_selections:
+                                    st.session_state.compare_selections.append(entry['id'])
+                                    if len(st.session_state.compare_selections) > 2:
+                                        st.session_state.compare_selections.pop(0)
+                                    st.experimental_rerun()
                     
-                    tabs = st.tabs(["Request Info", "Response Info"])
+                    # Show comparison if two items are selected
+                    if (st.session_state.compare_mode and 
+                        len(st.session_state.compare_selections) == 2 and 
+                        entry['id'] in st.session_state.compare_selections):
+                        st.markdown("### 📊 Comparison View")
+                        other_id = [id for id in st.session_state.compare_selections if id != entry['id']][0]
+                        other_entry = next(e for e in st.session_state.request_history if e['id'] == other_id)
+                        
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"**Current Request ({entry['id']})**")
+                            st.json(entry['response_info'])
+                        with col2:
+                            st.markdown(f"**Compared Request ({other_id})**")
+                            st.json(other_entry['response_info'])
+                    
+                    tabs = st.tabs(["Request Info", "Response Info", "Analysis"])
                     with tabs[0]:
                         st.json(entry['request_info'])
                     with tabs[1]:
                         st.json(entry['response_info'])
+                    with tabs[2]:
+                        from api_analyzer import analyze_api_health, get_optimization_suggestions
+                        health_metrics = analyze_api_health(entry['response_info'])
+                        suggestions = get_optimization_suggestions(entry['request_info'], entry['response_info'])
+                        
+                        st.markdown("#### 🏥 Health Metrics")
+                        for category, info in health_metrics.items():
+                            st.markdown(f"**{category}**: {info['status']} - {info['message']}")
+                        
+                        st.markdown("#### 🚀 Optimization Suggestions")
+                        for suggestion in suggestions:
+                            st.info(suggestion)
 
 if __name__ == "__main__":
     main()
