@@ -79,11 +79,17 @@ def main():
                 save_to_history(curl_command, request_info, response_info)
                 
                 # Display results in tabs
-                tab1, tab2, tab3 = st.tabs(["Request Details", "Response Details", "Raw Data"])
+                tab1, tab2, tab3, tab4, tab5 = st.tabs(["Request Details", "Response Details", "Raw Data", "Export Data", "AI Analysis"]) # Added a new tab
 
                 with tab1:
                     st.subheader("Request Analysis")
                     st.json(request_info)
+                    st.download_button(
+                        "Download Request Analysis",
+                        data=json.dumps(request_info, indent=2),
+                        file_name="request_analysis.json",
+                        mime="application/json"
+                    )
 
                 with tab2:
                     st.subheader("Response Analysis")
@@ -168,144 +174,18 @@ def main():
                         else:
                             st.warning(f"⚠️ {header} not present - {info['description']}")
                     
-                    # AI-Powered Analysis
-                    st.markdown("### 🤖 AI-Powered API Analysis")
-                    
-                    # Initialize chat state
-                    if 'chat_messages' not in st.session_state:
-                        st.session_state.chat_messages = []
-                    if 'chat_manager' not in st.session_state:
-                        from gemini_chat import GeminiChatManager
-                        st.session_state.chat_manager = GeminiChatManager()
-                    
-                    # Chat interface
-                    st.markdown("#### Chat with AI Assistant")
-                    
-                    # Display chat messages
-                    for message in st.session_state.chat_messages:
-                        with st.chat_message(message["role"]):
-                            st.markdown(message["content"])
-                    
-                    # Initialize file state
-                    if 'uploaded_files_data' not in st.session_state:
-                        st.session_state.uploaded_files_data = []
-
-                    # File uploader in a container
-                    with st.container():
-                        uploaded_files = st.file_uploader(
-                            "Upload API-related files for analysis",
-                            accept_multiple_files=True,
-                            type=['py', 'json', 'yaml', 'txt'],
-                            key='file_uploader'
-                        )
-                        
-                        # Process new uploads
-                        if uploaded_files:
-                            new_files = []
-                            for file in uploaded_files:
-                                content = file.read()
-                                file.seek(0)  # Reset file pointer
-                                new_files.append({
-                                    'name': file.name,
-                                    'content': content
-                                })
-                            st.session_state.uploaded_files_data = new_files
-                    
-                    # Display uploaded files
-                    if st.session_state.uploaded_files_data:
-                        st.markdown("### 📎 Uploaded Files")
-                        for file_data in st.session_state.uploaded_files_data:
-                            st.markdown(f"- {file_data['name']}")
-                    
-                    # Initialize analysis with current request/response
-                    if st.button("Analyze Current API Call", key='analyze_button'):
-                        with st.spinner("Analyzing API with AI..."):
-                            try:
-                                # Process all uploaded files
-                                file_contents = []
-                                for file_data in st.session_state.uploaded_files_data:
-                                    processed = st.session_state.chat_manager.process_uploaded_file(
-                                        file_data['content'],
-                                        file_data['name']
-                                    )
-                                    file_contents.append(processed)
-                                
-                                # Get AI analysis
-                                ai_analysis = st.session_state.chat_manager.analyze_api(
-                                    request_info,
-                                    response_info,
-                                    additional_context="\n\n".join(file_contents) if file_contents else None
-                                )
-                                
-                                # Add response to chat
-                                st.session_state.chat_messages.append({
-                                    "role": "assistant",
-                                    "content": ai_analysis["analysis"]
-                                })
-                                
-                                # Provide optimized code download if available
-                                if ai_analysis.get("files_path"):
-                                    with open(ai_analysis["files_path"], "rb") as f:
-                                        st.download_button(
-                                            "Download Optimized API Implementation",
-                                            f,
-                                            file_name="optimized_api.zip",
-                                            mime="application/zip",
-                                            key='download_button'
-                                        )
-                            except Exception as e:
-                                st.error(f"Error during AI analysis: {str(e)}")
-                    
-                    # Chat input
-                    if prompt := st.chat_input("Ask about API optimization..."):
-                        # Add user message to chat
-                        st.session_state.chat_messages.append({
-                            "role": "user",
-                            "content": prompt
-                        })
-                        
-                        # Process uploaded files
-                        file_contents = []
-                        if uploaded_files:
-                            for file in uploaded_files:
-                                file_contents.append(
-                                    st.session_state.chat_manager.process_uploaded_file(
-                                        file.read(),
-                                        file.name
-                                    )
-                                )
-                        
-                        # Get AI response
-                        with st.spinner("AI is thinking..."):
-                            try:
-                                response = st.session_state.chat_manager.analyze_api(
-                                    request_info,
-                                    response_info,
-                                    additional_context="\n\n".join(file_contents) if file_contents else None,
-                                    user_prompt=prompt
-                                )
-                                
-                                # Add AI response to chat
-                                st.session_state.chat_messages.append({
-                                    "role": "assistant",
-                                    "content": response["analysis"]
-                                })
-                                
-                                # Provide optimized code download if available
-                                if response.get("files_path"):
-                                    with open(response["files_path"], "rb") as f:
-                                        st.download_button(
-                                            "Download Optimized API Implementation",
-                                            f,
-                                            file_name="optimized_api.zip",
-                                            mime="application/zip"
-                                        )
-                            except Exception as e:
-                                st.error(f"Error getting AI response: {str(e)}")
-                                st.session_state.chat_messages.append({
-                                    "role": "assistant",
-                                    "content": f"Sorry, I encountered an error: {str(e)}"
-                                })
+                    # Add download button for response data
+                    st.download_button(
+                        "Download Complete Analysis",
+                        data=json.dumps({
+                            'request': request_info,
+                            'response': response_info,
+                            'timing': response_info['metadata']['timing'],
+                            'security': response_info['metadata']['security_analysis']
+                        }, indent=2),
+                        file_name="complete_analysis.json",
+                        mime="application/json"
+                    )
                     
                     # Response Content
                     if response_info['content']:
@@ -321,6 +201,184 @@ def main():
                 with tab3:
                     st.subheader("Raw Response")
                     st.code(response_info['raw'])
+                    st.download_button(
+                        "Download Raw Response",
+                        data=response_info['raw'],
+                        file_name="raw_response.txt",
+                        mime="text/plain"
+                    )
+
+                with tab4:
+                    st.subheader("Export Data")
+                    st.download_button(
+                        "Download Request as JSON",
+                        data=json.dumps(request_info, indent=2),
+                        file_name='request_data.json',
+                        mime='application/json'
+                    )
+                    st.download_button(
+                        "Download Response as JSON",
+                        data=json.dumps(response_info, indent=2),
+                        file_name='response_data.json',
+                        mime='application/json'
+                    )
+                    st.download_button(
+                        "Download Raw Response as Text",
+                        data=response_info['raw'],
+                        file_name='raw_response.txt',
+                        mime='text/plain'
+                    )
+                    st.download_button(
+                        "Download All Data as JSON",
+                        data=json.dumps({
+                            'request': request_info,
+                            'response': response_info,
+                            'raw_response': response_info['raw']
+                        }, indent=2),
+                        file_name='all_data.json',
+                        mime='application/json'
+                    )
+
+
+                with tab5: # AI Analysis Tab
+                    st.subheader("🤖 AI-Powered API Analysis")
+
+                    # Initialize chat state
+                    if 'chat_messages' not in st.session_state:
+                        st.session_state.chat_messages = []
+                    if 'chat_manager' not in st.session_state:
+                        from gemini_chat import GeminiChatManager
+                        st.session_state.chat_manager = GeminiChatManager()
+
+                    # Chat interface
+                    st.markdown("#### Chat with AI Assistant")
+
+                    # Display chat messages
+                    for message in st.session_state.chat_messages:
+                        with st.chat_message(message["role"]):
+                            st.markdown(message["content"])
+
+                    # Initialize file state
+                    if 'uploaded_files_data' not in st.session_state:
+                        st.session_state.uploaded_files_data = []
+
+                    # File uploader in a container
+                    with st.container():
+                        uploaded_files = st.file_uploader(
+                            "Upload API-related files for analysis",
+                            accept_multiple_files=True,
+                            type=['py', 'json', 'yaml', 'txt'],
+                            key='file_uploader'
+                        )
+
+                        # Process new uploads
+                        if uploaded_files:
+                            new_files = []
+                            for file in uploaded_files:
+                                content = file.read()
+                                file.seek(0)  # Reset file pointer
+                                new_files.append({
+                                    'name': file.name,
+                                    'content': content
+                                })
+                            st.session_state.uploaded_files_data = new_files
+
+                    # Display uploaded files
+                    if st.session_state.uploaded_files_data:
+                        st.markdown("### 📎 Uploaded Files")
+                        for file_data in st.session_state.uploaded_files_data:
+                            st.markdown(f"- {file_data['name']}")
+
+                    # Initialize analysis with current request/response
+                    if st.button("Analyze Current API Call", key='analyze_button'):
+                        with st.spinner("Analyzing API with AI..."):
+                            try:
+                                # Process all uploaded files
+                                file_contents = []
+                                for file_data in st.session_state.uploaded_files_data:
+                                    processed = st.session_state.chat_manager.process_uploaded_file(
+                                        file_data['content'],
+                                        file_data['name']
+                                    )
+                                    file_contents.append(processed)
+
+                                # Get AI analysis
+                                ai_analysis = st.session_state.chat_manager.analyze_api(
+                                    request_info,
+                                    response_info,
+                                    additional_context="\n\n".join(file_contents) if file_contents else None
+                                )
+
+                                # Add response to chat
+                                st.session_state.chat_messages.append({
+                                    "role": "assistant",
+                                    "content": ai_analysis["analysis"]
+                                })
+
+                                # Provide optimized code download if available
+                                if ai_analysis.get("files_path"):
+                                    with open(ai_analysis["files_path"], "rb") as f:
+                                        st.download_button(
+                                            "Download Optimized API Implementation",
+                                            f,
+                                            file_name="optimized_api.zip",
+                                            mime="application/zip",
+                                            key='download_button'
+                                        )
+                            except Exception as e:
+                                st.error(f"Error during AI analysis: {str(e)}")
+
+                    # Chat input
+                    if prompt := st.chat_input("Ask about API optimization..."):
+                        # Add user message to chat
+                        st.session_state.chat_messages.append({
+                            "role": "user",
+                            "content": prompt
+                        })
+
+                        # Process uploaded files
+                        file_contents = []
+                        if uploaded_files:
+                            for file in uploaded_files:
+                                file_contents.append(
+                                    st.session_state.chat_manager.process_uploaded_file(
+                                        file.read(),
+                                        file.name
+                                    )
+                                )
+
+                        # Get AI response
+                        with st.spinner("AI is thinking..."):
+                            try:
+                                response = st.session_state.chat_manager.analyze_api(
+                                    request_info,
+                                    response_info,
+                                    additional_context="\n\n".join(file_contents) if file_contents else None,
+                                    user_prompt=prompt
+                                )
+
+                                # Add AI response to chat
+                                st.session_state.chat_messages.append({
+                                    "role": "assistant",
+                                    "content": response["analysis"]
+                                })
+
+                                # Provide optimized code download if available
+                                if response.get("files_path"):
+                                    with open(response["files_path"], "rb") as f:
+                                        st.download_button(
+                                            "Download Optimized API Implementation",
+                                            f,
+                                            file_name="optimized_api.zip",
+                                            mime="application/zip"
+                                        )
+                            except Exception as e:
+                                st.error(f"Error getting AI response: {str(e)}")
+                                st.session_state.chat_messages.append({
+                                    "role": "assistant",
+                                    "content": f"Sorry, I encountered an error: {str(e)}"
+                                })
+
 
         except Exception as e:
             st.error(f"Error analyzing curl command: {str(e)}")
