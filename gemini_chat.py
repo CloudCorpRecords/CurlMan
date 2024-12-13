@@ -33,6 +33,8 @@ def create_chat_session(model, history: List = None):
 def format_api_analysis(request_info: Dict, response_info: Dict) -> str:
     """Format API analysis for Gemini input."""
     return f"""
+    You are an API optimization expert. Here's the detailed information about an API request and response to analyze:
+
     API Request Analysis:
     - Method: {request_info.get('method')}
     - Endpoint: {request_info.get('url_analysis', {}).get('path')}
@@ -45,7 +47,23 @@ def format_api_analysis(request_info: Dict, response_info: Dict) -> str:
     
     Security Analysis:
     {json.dumps(response_info.get('metadata', {}).get('security_analysis', {}), indent=2)}
+
+    Please analyze this information and provide:
+    1. Detailed performance optimization suggestions
+    2. Security improvements
+    3. Best practices recommendations
+    4. Code samples for implementing the improvements
+
+    You can also process any additional files the user provides to help with the optimization.
     """
+
+def process_uploaded_file(file_content: bytes, file_name: str) -> str:
+    """Process an uploaded file and extract relevant information."""
+    try:
+        content = file_content.decode('utf-8')
+        return f"File: {file_name}\n\nContent:\n{content}"
+    except UnicodeDecodeError:
+        return f"Binary file uploaded: {file_name}"
 
 def create_optimized_api_files(chat_response: str) -> str:
     """
@@ -133,7 +151,13 @@ class GeminiChatManager:
         """Start a new chat session."""
         self.chat_session = create_chat_session(self.model)
         
-    def analyze_api(self, request_info: Dict, response_info: Dict) -> Dict[str, Any]:
+    def analyze_api(
+        self,
+        request_info: Dict,
+        response_info: Dict,
+        additional_context: str = None,
+        user_prompt: str = None
+    ) -> Dict[str, Any]:
         """
         Analyze API request and response, provide optimization suggestions,
         and generate optimized code if needed.
@@ -145,25 +169,29 @@ class GeminiChatManager:
         analysis = format_api_analysis(request_info, response_info)
         
         # Prepare the prompt
-        prompt = f"""
-        As an API optimization expert, analyze this API implementation and provide:
-        1. Detailed performance optimization suggestions
-        2. Security improvements
-        3. Best practices recommendations
-        4. Optimized code implementation if necessary
+        base_prompt = f"""
+        As an API optimization expert, analyze this API implementation and provide detailed recommendations.
         
         Here's the API analysis to review:
         {analysis}
-        
-        Please provide your response in the following format:
-        1. Analysis summary
-        2. Specific recommendations
-        3. If code changes are needed, include them in code blocks with filenames
-        4. Implementation steps
         """
         
+        if additional_context:
+            base_prompt += f"\n\nAdditional files for analysis:\n{additional_context}"
+            
+        if user_prompt:
+            base_prompt += f"\n\nUser question: {user_prompt}"
+        else:
+            base_prompt += """
+            Please provide your response in the following format:
+            1. Analysis summary
+            2. Specific recommendations
+            3. If code changes are needed, include them in code blocks with filenames
+            4. Implementation steps
+            """
+        
         # Get model response
-        response = self.chat_session.send_message(prompt)
+        response = self.chat_session.send_message(base_prompt)
         
         # Generate files if the response contains code blocks
         zip_path = None

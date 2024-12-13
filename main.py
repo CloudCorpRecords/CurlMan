@@ -170,17 +170,38 @@ def main():
                     
                     # AI-Powered Analysis
                     st.markdown("### 🤖 AI-Powered API Analysis")
-                    if st.button("Analyze with AI"):
+                    
+                    # Initialize chat state
+                    if 'chat_messages' not in st.session_state:
+                        st.session_state.chat_messages = []
+                    if 'chat_manager' not in st.session_state:
                         from gemini_chat import GeminiChatManager
-                        chat_manager = GeminiChatManager()
-                        
+                        st.session_state.chat_manager = GeminiChatManager()
+                    
+                    # Chat interface
+                    st.markdown("#### Chat with AI Assistant")
+                    
+                    # Display chat messages
+                    for message in st.session_state.chat_messages:
+                        with st.chat_message(message["role"]):
+                            st.markdown(message["content"])
+                    
+                    # File uploader
+                    uploaded_files = st.file_uploader(
+                        "Upload API-related files for analysis",
+                        accept_multiple_files=True,
+                        type=['py', 'json', 'yaml', 'txt']
+                    )
+                    
+                    # Initialize analysis with current request/response
+                    if st.button("Analyze Current API Call"):
                         with st.spinner("Analyzing API with AI..."):
                             try:
-                                ai_analysis = chat_manager.analyze_api(request_info, response_info)
-                                
-                                # Display AI analysis
-                                st.markdown("#### AI Analysis and Recommendations")
-                                st.markdown(ai_analysis["analysis"])
+                                ai_analysis = st.session_state.chat_manager.analyze_api(request_info, response_info)
+                                st.session_state.chat_messages.append({
+                                    "role": "assistant",
+                                    "content": ai_analysis["analysis"]
+                                })
                                 
                                 # Provide optimized code download if available
                                 if ai_analysis.get("files_path"):
@@ -193,6 +214,57 @@ def main():
                                         )
                             except Exception as e:
                                 st.error(f"Error during AI analysis: {str(e)}")
+                    
+                    # Chat input
+                    if prompt := st.chat_input("Ask about API optimization..."):
+                        # Add user message to chat
+                        st.session_state.chat_messages.append({
+                            "role": "user",
+                            "content": prompt
+                        })
+                        
+                        # Process uploaded files
+                        file_contents = []
+                        if uploaded_files:
+                            for file in uploaded_files:
+                                file_contents.append(
+                                    st.session_state.chat_manager.process_uploaded_file(
+                                        file.read(),
+                                        file.name
+                                    )
+                                )
+                        
+                        # Get AI response
+                        with st.spinner("AI is thinking..."):
+                            try:
+                                response = st.session_state.chat_manager.analyze_api(
+                                    request_info,
+                                    response_info,
+                                    additional_context="\n\n".join(file_contents) if file_contents else None,
+                                    user_prompt=prompt
+                                )
+                                
+                                # Add AI response to chat
+                                st.session_state.chat_messages.append({
+                                    "role": "assistant",
+                                    "content": response["analysis"]
+                                })
+                                
+                                # Provide optimized code download if available
+                                if response.get("files_path"):
+                                    with open(response["files_path"], "rb") as f:
+                                        st.download_button(
+                                            "Download Optimized API Implementation",
+                                            f,
+                                            file_name="optimized_api.zip",
+                                            mime="application/zip"
+                                        )
+                            except Exception as e:
+                                st.error(f"Error getting AI response: {str(e)}")
+                                st.session_state.chat_messages.append({
+                                    "role": "assistant",
+                                    "content": f"Sorry, I encountered an error: {str(e)}"
+                                })
                     
                     # Response Content
                     if response_info['content']:
