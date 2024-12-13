@@ -60,10 +60,24 @@ def format_api_analysis(request_info: Dict, response_info: Dict) -> str:
 def process_uploaded_file(file_content: bytes, file_name: str) -> str:
     """Process an uploaded file and extract relevant information."""
     try:
-        content = file_content.decode('utf-8')
-        return f"File: {file_name}\n\nContent:\n{content}"
+        # Handle bytes or string input
+        if isinstance(file_content, bytes):
+            content = file_content.decode('utf-8')
+        else:
+            content = str(file_content)
+        
+        # Format the content for the AI
+        formatted_content = f"""
+File: {file_name}
+
+Content:
+{content}
+
+Please analyze this file in the context of the API implementation and provide suggestions for improvement.
+"""
+        return formatted_content
     except UnicodeDecodeError:
-        return f"Binary file uploaded: {file_name}"
+        return f"Binary file uploaded: {file_name} (content cannot be processed)"
 
 def create_optimized_api_files(chat_response: str) -> str:
     """

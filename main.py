@@ -186,18 +186,58 @@ def main():
                         with st.chat_message(message["role"]):
                             st.markdown(message["content"])
                     
-                    # File uploader
-                    uploaded_files = st.file_uploader(
-                        "Upload API-related files for analysis",
-                        accept_multiple_files=True,
-                        type=['py', 'json', 'yaml', 'txt']
-                    )
+                    # Initialize file state
+                    if 'uploaded_files_data' not in st.session_state:
+                        st.session_state.uploaded_files_data = []
+
+                    # File uploader in a container
+                    with st.container():
+                        uploaded_files = st.file_uploader(
+                            "Upload API-related files for analysis",
+                            accept_multiple_files=True,
+                            type=['py', 'json', 'yaml', 'txt'],
+                            key='file_uploader'
+                        )
+                        
+                        # Process new uploads
+                        if uploaded_files:
+                            new_files = []
+                            for file in uploaded_files:
+                                content = file.read()
+                                file.seek(0)  # Reset file pointer
+                                new_files.append({
+                                    'name': file.name,
+                                    'content': content
+                                })
+                            st.session_state.uploaded_files_data = new_files
+                    
+                    # Display uploaded files
+                    if st.session_state.uploaded_files_data:
+                        st.markdown("### 📎 Uploaded Files")
+                        for file_data in st.session_state.uploaded_files_data:
+                            st.markdown(f"- {file_data['name']}")
                     
                     # Initialize analysis with current request/response
-                    if st.button("Analyze Current API Call"):
+                    if st.button("Analyze Current API Call", key='analyze_button'):
                         with st.spinner("Analyzing API with AI..."):
                             try:
-                                ai_analysis = st.session_state.chat_manager.analyze_api(request_info, response_info)
+                                # Process all uploaded files
+                                file_contents = []
+                                for file_data in st.session_state.uploaded_files_data:
+                                    processed = st.session_state.chat_manager.process_uploaded_file(
+                                        file_data['content'],
+                                        file_data['name']
+                                    )
+                                    file_contents.append(processed)
+                                
+                                # Get AI analysis
+                                ai_analysis = st.session_state.chat_manager.analyze_api(
+                                    request_info,
+                                    response_info,
+                                    additional_context="\n\n".join(file_contents) if file_contents else None
+                                )
+                                
+                                # Add response to chat
                                 st.session_state.chat_messages.append({
                                     "role": "assistant",
                                     "content": ai_analysis["analysis"]
@@ -210,7 +250,8 @@ def main():
                                             "Download Optimized API Implementation",
                                             f,
                                             file_name="optimized_api.zip",
-                                            mime="application/zip"
+                                            mime="application/zip",
+                                            key='download_button'
                                         )
                             except Exception as e:
                                 st.error(f"Error during AI analysis: {str(e)}")
