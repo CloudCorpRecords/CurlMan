@@ -4,6 +4,11 @@ from curl_parser import parse_curl_command
 from request_analyzer import analyze_request
 from response_analyzer import analyze_response
 from utils import format_data, calculate_size
+from history_manager import HistoryManager
+
+# Initialize history manager in session state
+if 'history_manager' not in st.session_state:
+    st.session_state.history_manager = HistoryManager()
 
 st.set_page_config(
     page_title="Curl Command Analyzer",
@@ -44,7 +49,7 @@ def main():
                 execution_time = (time.time() - start_time) * 1000  # Convert to ms
 
                 # Display results in tabs
-                tab1, tab2, tab3 = st.tabs(["Request Details", "Response Details", "Raw Data"])
+                tab1, tab2, tab3, tab4 = st.tabs(["Request Details", "Response Details", "Raw Data", "History"])
 
                 with tab1:
                     st.subheader("Request Analysis")
@@ -109,6 +114,38 @@ def main():
                                 response_info['content_type']
                             ),
                             language="json" if "json" in response_info['content_type'] else "markup"
+                with tab4:
+                    st.subheader("Request History")
+                    history = st.session_state.history_manager.get_history()
+                    
+                    if not history:
+                        st.info("No requests made yet.")
+                    else:
+                        for idx, entry in enumerate(reversed(history)):
+                            with st.expander(f"Request {len(history)-idx}: {entry.timestamp}"):
+                                st.code(entry.curl_command, language="bash")
+                                col1, col2, col3 = st.columns(3)
+                                with col1:
+                                    st.metric("Status", f"{entry.response_info['status_code']}")
+                                with col2:
+                                    st.metric("Time", f"{entry.execution_time:.2f}ms")
+                                with col3:
+                                    st.metric("Size", entry.response_info['metadata']['size'])
+                                
+                                if st.button("Compare with Latest", key=f"compare_{idx}"):
+                                    latest = st.session_state.history_manager.get_last_entry()
+                                    if latest and entry != latest:
+                                        comparison = st.session_state.history_manager.compare_responses(entry, latest)
+                                        st.json(comparison)
+
+                # Add current request to history
+                st.session_state.history_manager.add_entry(
+                    curl_command=curl_command,
+                    request_info=request_info,
+                    response_info=response_info,
+                    success=True,
+                    execution_time=execution_time
+                )
                         )
 
                 with tab3:
