@@ -168,6 +168,32 @@ def main():
                         else:
                             st.warning(f"⚠️ {header} not present - {info['description']}")
                     
+                    # AI-Powered Analysis
+                    st.markdown("### 🤖 AI-Powered API Analysis")
+                    if st.button("Analyze with AI"):
+                        from gemini_chat import GeminiChatManager
+                        chat_manager = GeminiChatManager()
+                        
+                        with st.spinner("Analyzing API with AI..."):
+                            try:
+                                ai_analysis = chat_manager.analyze_api(request_info, response_info)
+                                
+                                # Display AI analysis
+                                st.markdown("#### AI Analysis and Recommendations")
+                                st.markdown(ai_analysis["analysis"])
+                                
+                                # Provide optimized code download if available
+                                if ai_analysis.get("files_path"):
+                                    with open(ai_analysis["files_path"], "rb") as f:
+                                        st.download_button(
+                                            "Download Optimized API Implementation",
+                                            f,
+                                            file_name="optimized_api.zip",
+                                            mime="application/zip"
+                                        )
+                            except Exception as e:
+                                st.error(f"Error during AI analysis: {str(e)}")
+                    
                     # Response Content
                     if response_info['content']:
                         st.markdown("### 📄 Response Content")
