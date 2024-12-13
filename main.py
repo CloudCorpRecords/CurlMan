@@ -13,15 +13,9 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize session state
+# Initialize session state for history
 if 'request_history' not in st.session_state:
     st.session_state.request_history = []
-if 'environment_vars' not in st.session_state:
-    st.session_state.environment_vars = {"Global": {}, "Local": {}}
-if 'active_environment' not in st.session_state:
-    st.session_state.active_environment = "Local"
-if 'templates' not in st.session_state:
-    st.session_state.templates = {}
 
 def save_to_history(curl_command, request_info, response_info):
     """Save the request and response information to history with enhanced metadata."""
@@ -48,91 +42,7 @@ def main():
     st.title("🔍 Curl Command Analyzer")
     
     # Create tabs for current request and history
-    current_tab, history_tab, env_tab, templates_tab = st.tabs([
-        "New Request", 
-        "Request History",
-        "Environment Variables",
-        "Request Templates"
-    ])
-    
-    # Environment Variables Tab
-    with env_tab:
-        st.subheader("🔧 Environment Variables")
-        
-        # Environment selector
-        env_type = st.selectbox(
-            "Select Environment",
-            ["Global", "Local"],
-            index=0 if st.session_state.active_environment == "Global" else 1
-        )
-        st.session_state.active_environment = env_type
-        
-        # Add new variable
-        col1, col2, col3 = st.columns([2, 2, 1])
-        with col1:
-            new_var_name = st.text_input("Variable Name", key="new_var_name")
-        with col2:
-            new_var_value = st.text_input("Value", key="new_var_value", type="password")
-        with col3:
-            if st.button("Add Variable"):
-                if new_var_name and new_var_value:
-                    st.session_state.environment_vars[env_type][new_var_name] = new_var_value
-                    st.success(f"Added variable: {new_var_name}")
-                    st.rerun()
-        
-        # Display current variables
-        st.markdown("### Current Variables")
-        if st.session_state.environment_vars[env_type]:
-            for var_name, var_value in st.session_state.environment_vars[env_type].items():
-                col1, col2, col3 = st.columns([2, 2, 1])
-                with col1:
-                    st.text(var_name)
-                with col2:
-                    st.text("*" * 8)
-                with col3:
-                    if st.button("Delete", key=f"del_{var_name}"):
-                        del st.session_state.environment_vars[env_type][var_name]
-                        st.rerun()
-        else:
-            st.info("No variables defined in this environment")
-            
-    # Templates Tab
-    with templates_tab:
-        st.subheader("📝 Request Templates")
-        
-        # Add new template
-        st.markdown("### Save New Template")
-        template_name = st.text_input("Template Name")
-        template_desc = st.text_area("Description")
-        template_curl = st.text_area("Curl Command")
-        
-        if st.button("Save Template"):
-            if template_name and template_curl:
-                st.session_state.templates[template_name] = {
-                    "curl_command": template_curl,
-                    "description": template_desc,
-                    "created_at": datetime.now().isoformat()
-                }
-                st.success(f"Saved template: {template_name}")
-                st.rerun()
-        
-        # List templates
-        st.markdown("### Saved Templates")
-        if st.session_state.templates:
-            for name, template in st.session_state.templates.items():
-                with st.expander(f"{name} - {template['description'][:50]}..."):
-                    st.text_area("Curl Command", template['curl_command'], key=f"template_{name}")
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.button("Load", key=f"load_{name}"):
-                            st.session_state.curl_input = template['curl_command']
-                            st.rerun()
-                    with col2:
-                        if st.button("Delete", key=f"delete_{name}"):
-                            del st.session_state.templates[name]
-                            st.rerun()
-        else:
-            st.info("No templates saved yet")
+    current_tab, history_tab = st.tabs(["New Request", "Request History"])
     
     with current_tab:
         st.markdown("""
@@ -154,20 +64,8 @@ def main():
 
         try:
             with st.spinner("Analyzing curl command..."):
-                # Substitute environment variables
-                processed_command = curl_command
-                for var_name, var_value in st.session_state.environment_vars[st.session_state.active_environment].items():
-                    placeholder = "{{" + var_name + "}}"
-                    processed_command = processed_command.replace(placeholder, var_value)
-                
-                # Apply global variables only if not already replaced
-                for var_name, var_value in st.session_state.environment_vars["Global"].items():
-                    placeholder = "{{" + var_name + "}}"
-                    if placeholder in processed_command:
-                        processed_command = processed_command.replace(placeholder, var_value)
-                
                 # Parse curl command
-                parsed_request = parse_curl_command(processed_command)
+                parsed_request = parse_curl_command(curl_command)
                 
                 # Analyze request
                 request_info = analyze_request(parsed_request)
