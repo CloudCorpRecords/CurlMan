@@ -1,5 +1,7 @@
 import streamlit as st
 import time
+import json
+from datetime import datetime
 from curl_parser import parse_curl_command
 from request_analyzer import analyze_request
 from response_analyzer import analyze_response
@@ -11,12 +13,33 @@ st.set_page_config(
     layout="wide"
 )
 
+# Initialize session state for history
+if 'request_history' not in st.session_state:
+    st.session_state.request_history = []
+
+def save_to_history(curl_command, request_info, response_info):
+    """Save the request and response information to history."""
+    history_entry = {
+        'timestamp': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+        'curl_command': curl_command,
+        'request_info': request_info,
+        'response_info': response_info,
+        'status_code': response_info['status_code'],
+        'execution_time': response_info['metadata']['timing']['total_time']
+    }
+    st.session_state.request_history.insert(0, history_entry)  # Add to beginning of list
+
 def main():
     st.title("🔍 Curl Command Analyzer")
-    st.markdown("""
-    Enter a curl command to analyze its request and response details.
-    The tool will provide comprehensive information about the API call.
-    """)
+    
+    # Create tabs for current request and history
+    current_tab, history_tab = st.tabs(["New Request", "Request History"])
+    
+    with current_tab:
+        st.markdown("""
+        Enter a curl command to analyze its request and response details.
+        The tool will provide comprehensive information about the API call.
+        """)
 
     # Input area
     curl_command = st.text_area(
@@ -43,6 +66,9 @@ def main():
                 response_info = analyze_response(parsed_request)
                 execution_time = (time.time() - start_time) * 1000  # Convert to ms
 
+                # Save to history
+                save_to_history(curl_command, request_info, response_info)
+                
                 # Display results in tabs
                 tab1, tab2, tab3 = st.tabs(["Request Details", "Response Details", "Raw Data"])
 
@@ -117,6 +143,34 @@ def main():
 
         except Exception as e:
             st.error(f"Error analyzing curl command: {str(e)}")
+    
+    with history_tab:
+        st.subheader("📜 Request History")
+        if not st.session_state.request_history:
+            st.info("No requests have been made yet. Your request history will appear here.")
+        else:
+            for i, entry in enumerate(st.session_state.request_history):
+                with st.expander(
+                    f"[{entry['status_code']}] {entry['timestamp']} - {entry['curl_command'][:50]}..."
+                ):
+                    st.text("Curl Command:")
+                    st.code(entry['curl_command'])
+                    
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Status Code", entry['status_code'])
+                    with col2:
+                        st.metric("Execution Time", entry['execution_time'])
+                    with col3:
+                        if st.button("Rerun Request", key=f"rerun_{i}"):
+                            st.session_state.rerun_command = entry['curl_command']
+                            st.experimental_rerun()
+                    
+                    tabs = st.tabs(["Request Info", "Response Info"])
+                    with tabs[0]:
+                        st.json(entry['request_info'])
+                    with tabs[1]:
+                        st.json(entry['response_info'])
 
 if __name__ == "__main__":
     main()
