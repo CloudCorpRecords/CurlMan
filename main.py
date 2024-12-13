@@ -79,6 +79,8 @@ def main():
                 with tab2:
                     st.subheader("Response Analysis")
                     
+                    from api_analyzer import analyze_api_health, get_optimization_suggestions
+                    
                     # Response metrics
                     col1, col2, col3 = st.columns(3)
                     with col1:
@@ -87,6 +89,37 @@ def main():
                         st.metric("Status Code", f"{response_info['status_code']} ({response_info['reason']})")
                     with col3:
                         st.metric("Response Size", response_info['metadata']['size'])
+                    
+                    # API Health Analysis
+                    st.markdown("### 🏥 API Health Analysis")
+                    health_metrics = analyze_api_health(response_info)
+                    
+                    # Display health metrics with color-coded status
+                    for category, info in health_metrics.items():
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            status_color = {
+                                'good': '🟢',
+                                'warning': '🟡',
+                                'poor': '🔴',
+                                'checking': '⚪'
+                            }[info['status']]
+                            st.markdown(f"### {status_color} {category.title()}")
+                        with col2:
+                            st.markdown(f"**Status**: {info['message']}")
+                            if info['recommendations']:
+                                st.markdown("**Recommendations:**")
+                                for rec in info['recommendations']:
+                                    st.markdown(f"- {rec}")
+                    
+                    # Optimization Suggestions
+                    st.markdown("### 🚀 Optimization Suggestions")
+                    suggestions = get_optimization_suggestions(request_info, response_info)
+                    if suggestions:
+                        for suggestion in suggestions:
+                            st.info(suggestion)
+                    else:
+                        st.success("No immediate optimization suggestions - API appears to be well-optimized!")
                     
                     # Timing breakdown
                     st.markdown("### 📊 Timing Breakdown")
