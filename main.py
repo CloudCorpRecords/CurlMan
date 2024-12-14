@@ -270,7 +270,7 @@ def main():
                     st.success(f"Saved template '{template_name}' to collection '{selected_collection}'")
                 
                 # Display results in tabs
-                tab1, tab2, tab3, tab4, tab5 = st.tabs(["Request Details", "Response Details", "Raw Data", "Export Data", "AI Analysis"]) # Added a new tab
+                tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["Request Details", "Response Details", "Raw Data", "Export Data", "AI Analysis", "GraphQL Builder"])
 
                 with tab1:
                     st.subheader("Request Analysis")
@@ -571,6 +571,118 @@ def main():
                                 })
 
 
+                        with tab6:
+                            st.subheader("🔮 GraphQL Query Builder")
+                            
+                            # Initialize GraphQL handler if not exists
+                            if 'graphql_handler' not in st.session_state:
+                                from graphql_handler import GraphQLAnalyzer
+                                st.session_state.graphql_handler = GraphQLAnalyzer()
+                            
+                            # GraphQL endpoint input
+                            graphql_endpoint = st.text_input(
+                                "GraphQL Endpoint",
+                                placeholder="https://api.example.com/graphql"
+                            )
+                            
+                            # Operation type selector
+                            operation_type = st.selectbox(
+                                "Operation Type",
+                                ["Query", "Mutation"],
+                                key="graphql_operation_type"
+                            )
+                            
+                            # Operation name input
+                            operation_name = st.text_input(
+                                "Operation Name (Optional)",
+                                placeholder="MyQuery"
+                            )
+                            
+                            # Dynamic field builder
+                            st.subheader("Build Query")
+                            with st.expander("Add Field", expanded=True):
+                                field_col1, field_col2 = st.columns([2, 1])
+                                with field_col1:
+                                    field_name = st.text_input("Field Name")
+                                with field_col2:
+                                    has_subfields = st.checkbox("Has Subfields")
+                                
+                                if has_subfields:
+                                    subfields = st.text_area(
+                                        "Subfields (one per line)",
+                                        placeholder="id\nname\ncreatedAt"
+                                    )
+                                
+                                # Arguments
+                                has_args = st.checkbox("Add Arguments")
+                                if has_args:
+                                    args_text = st.text_area(
+                                        "Arguments (JSON format)",
+                                        placeholder='{\n  "id": "123",\n  "limit": 10\n}'
+                                    )
+                                
+                                if st.button("Add Field"):
+                                    if 'query_builder' not in st.session_state:
+                                        st.session_state.query_builder = []
+                                    
+                                    field_data = {
+                                        "name": field_name,
+                                        "subfields": subfields.split("\n") if has_subfields and subfields else None,
+                                        "args": json.loads(args_text) if has_args and args_text else None
+                                    }
+                                    st.session_state.query_builder.append(field_data)
+                                    st.success(f"Added field: {field_name}")
+                            
+                            # Display current query
+                            if 'query_builder' in st.session_state and st.session_state.query_builder:
+                                st.subheader("Current Query")
+                                query = st.session_state.graphql_handler.query_builder.start_operation(
+                                    operation_type.lower(),
+                                    operation_name if operation_name else None
+                                )
+                                
+                                for field in st.session_state.query_builder:
+                                    query.add_field(
+                                        field["name"],
+                                        field["subfields"],
+                                        field["args"]
+                                    )
+                                
+                                request = query.build()
+                                st.code(request.query, language="graphql")
+                                
+                                # Execute query button
+                                if st.button("Execute Query") and graphql_endpoint:
+                                    try:
+                                        # Format request for our analyzer
+                                        request_data = st.session_state.graphql_handler.format_request(request)
+                                        request_data["url"] = graphql_endpoint
+                                        
+                                        # Execute and analyze the request
+                                        request_info = analyze_request(request_data)
+                                        response_info = analyze_response(request_data)
+                                        
+                                        # Parse GraphQL-specific response
+                                        graphql_analysis = st.session_state.graphql_handler.parse_response(
+                                            response_info["content"]
+                                        )
+                                        
+                                        # Display results
+                                        st.json(graphql_analysis)
+                                        
+                                        # Save to history
+                                        save_to_history(
+                                            f"# GraphQL {operation_type}\n{request.query}",
+                                            request_info,
+                                            response_info
+                                        )
+                                    except Exception as e:
+                                        st.error(f"Error executing GraphQL query: {str(e)}")
+                            
+                            # Reset button
+                            if st.button("Reset Query Builder"):
+                                st.session_state.query_builder = []
+                                st.rerun()
         except Exception as e:
             st.error(f"Error analyzing curl command: {str(e)}")
     
