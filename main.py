@@ -572,31 +572,41 @@ def main():
 
 
                         with tab6:
-                            st.subheader("🔮 GraphQL Query Builder")
+                            st.header("🔮 GraphQL Query Builder")
+                            st.markdown("""
+                            Build and test GraphQL queries with an interactive builder. 
+                            Enter your GraphQL endpoint and construct queries step by step.
+                            """)
                             
-                            # Initialize GraphQL handler if not exists
+                            # Initialize GraphQL handler and state if not exists
                             if 'graphql_handler' not in st.session_state:
                                 from graphql_handler import GraphQLAnalyzer
                                 st.session_state.graphql_handler = GraphQLAnalyzer()
+                                st.session_state.query_builder = []
                             
-                            # GraphQL endpoint input
-                            graphql_endpoint = st.text_input(
-                                "GraphQL Endpoint",
-                                placeholder="https://api.example.com/graphql"
-                            )
-                            
-                            # Operation type selector
-                            operation_type = st.selectbox(
-                                "Operation Type",
-                                ["Query", "Mutation"],
-                                key="graphql_operation_type"
-                            )
-                            
-                            # Operation name input
-                            operation_name = st.text_input(
-                                "Operation Name (Optional)",
-                                placeholder="MyQuery"
-                            )
+                            # GraphQL Configuration Section
+                            st.subheader("1. Configure GraphQL Request")
+                            with st.container():
+                                col1, col2 = st.columns([2, 1])
+                                with col1:
+                                    graphql_endpoint = st.text_input(
+                                        "GraphQL Endpoint",
+                                        placeholder="https://api.example.com/graphql",
+                                        help="Enter the URL of your GraphQL endpoint"
+                                    )
+                                with col2:
+                                    operation_type = st.selectbox(
+                                        "Operation Type",
+                                        ["Query", "Mutation"],
+                                        key="graphql_operation_type",
+                                        help="Choose the type of GraphQL operation"
+                                    )
+                                
+                                operation_name = st.text_input(
+                                    "Operation Name (Optional)",
+                                    placeholder="MyQuery",
+                                    help="Give your operation a name (e.g., GetUserProfile)"
+                                )
                             
                             # Dynamic field builder
                             st.subheader("Build Query")
