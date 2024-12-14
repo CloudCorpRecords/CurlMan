@@ -9,7 +9,7 @@ from datetime import datetime
 class WebSocketMessage:
     content: str
     direction: str  # 'sent' or 'received'
-    timestamp: str = None
+    timestamp: str = ""
     
     def __post_init__(self):
         if not self.timestamp:
@@ -30,8 +30,13 @@ class WebSocketHandler:
                 url,
                 extra_headers=extra_headers,
                 ping_interval=20,
-                ping_timeout=20
+                ping_timeout=20,
+                max_size=10_485_760  # 10MB max message size
             )
+            
+            # Start background task for receiving messages
+            asyncio.create_task(self._background_receive())
+            
             self.is_connected = True
             self.connection_info = {
                 'url': url,
@@ -48,6 +53,29 @@ class WebSocketHandler:
                 'status': 'Connection Failed'
             }
             return False
+            
+    async def _background_receive(self):
+        """Background task to receive messages."""
+        try:
+            while True:
+                if self.connection and self.is_connected:
+                    try:
+                        message = await self.connection.recv()
+                        self.messages.append(WebSocketMessage(
+                            content=message,
+                            direction='received'
+                        ))
+                    except websockets.exceptions.ConnectionClosed:
+                        self.is_connected = False
+                        break
+                    except Exception as e:
+                        print(f"Error receiving message: {e}")
+                        break
+                else:
+                    break
+        except Exception as e:
+            print(f"Background receive error: {e}")
+            self.is_connected = False
 
     async def disconnect(self):
         """Close WebSocket connection."""

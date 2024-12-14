@@ -78,25 +78,41 @@ def websocket_testing_view():
             if key and value:
                 header_list.append((key, value))
     
-    # Connection Controls
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Connect", disabled=not ws_url):
-            headers = dict(header_list) if header_list else None
-            async def connect():
-                return await st.session_state.websocket_handler.connect(ws_url, headers)
-            success = asyncio.run(connect())
-            if success:
-                st.success("Connected successfully!")
-            else:
-                st.error("Connection failed. Check the URL and try again.")
+    # Connection Controls and Status
+    status_col, control_col1, control_col2 = st.columns([1, 1, 1])
     
-    with col2:
-        if st.button("Disconnect"):
-            async def disconnect():
-                await st.session_state.websocket_handler.disconnect()
-            asyncio.run(disconnect())
-            st.success("Disconnected successfully!")
+    with status_col:
+        connection_info = st.session_state.websocket_handler.get_connection_info()
+        if connection_info['is_connected']:
+            st.success(f"Connected to {connection_info['url']}")
+        elif 'error' in connection_info:
+            st.error(f"Connection error: {connection_info['error']}")
+        else:
+            st.info("Not connected")
+    
+    with control_col1:
+        if st.button("Connect", disabled=not ws_url or connection_info['is_connected']):
+            headers = dict(header_list) if header_list else None
+            try:
+                async def connect():
+                    return await st.session_state.websocket_handler.connect(ws_url, headers)
+                success = asyncio.run(connect())
+                if success:
+                    st.success("Connected successfully!")
+                    st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Connection failed: {str(e)}")
+    
+    with control_col2:
+        if st.button("Disconnect", disabled=not connection_info['is_connected']):
+            try:
+                async def disconnect():
+                    await st.session_state.websocket_handler.disconnect()
+                asyncio.run(disconnect())
+                st.success("Disconnected successfully!")
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(f"Disconnect failed: {str(e)}")
     
     # Message Sending
     st.subheader("Send Message")
