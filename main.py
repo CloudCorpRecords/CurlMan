@@ -6,6 +6,7 @@ from curl_parser import parse_curl_command
 from request_analyzer import analyze_request
 from response_analyzer import analyze_response
 from utils import format_data, calculate_size
+from collections_manager import CollectionManager
 
 st.set_page_config(
     page_title="Curl Command Analyzer",
@@ -13,9 +14,17 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize session state for history
+# Initialize session states
 if 'request_history' not in st.session_state:
     st.session_state.request_history = []
+
+# Initialize collection manager
+if 'collection_manager' not in st.session_state:
+    st.session_state.collection_manager = CollectionManager()
+
+# Initialize selected environment
+if 'selected_environment' not in st.session_state:
+    st.session_state.selected_environment = "default"
 
 def save_to_history(curl_command, request_info, response_info):
     """Save the request and response information to history with enhanced metadata."""
@@ -39,9 +48,70 @@ def save_to_history(curl_command, request_info, response_info):
         st.session_state.request_history = st.session_state.request_history[:50]
 
 def main():
-    st.title("🔍 Curl Command Analyzer")
+    st.title("🔍 API Testing Studio")
     
-    # Create tabs for current request and history
+    # Sidebar for collections and environments
+    with st.sidebar:
+        st.header("📚 Collections")
+        collections = st.session_state.collection_manager.list_collections()
+        selected_collection = st.selectbox(
+            "Select Collection",
+            [""] + collections,
+            format_func=lambda x: "New Collection" if x == "" else x
+        )
+        
+        if selected_collection == "":
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                new_collection_name = st.text_input("Collection Name")
+            with col2:
+                if st.button("Create") and new_collection_name:
+                    st.session_state.collection_manager.create_collection(new_collection_name)
+                    st.rerun()
+        
+        st.header("🔧 Environment")
+        environments = list(st.session_state.collection_manager.environments.keys())
+        st.session_state.selected_environment = st.selectbox(
+            "Select Environment",
+            environments,
+            index=environments.index(st.session_state.selected_environment)
+        )
+        
+        # Environment variables editor
+        st.subheader("Environment Variables")
+        env_vars = st.session_state.collection_manager.get_environment(st.session_state.selected_environment)
+        
+        # Add new variable
+        col1, col2, col3 = st.columns([2, 2, 1])
+        with col1:
+            new_var_key = st.text_input("Key")
+        with col2:
+            new_var_value = st.text_input("Value", type="password")
+        with col3:
+            if st.button("Add") and new_var_key:
+                st.session_state.collection_manager.set_environment_variable(
+                    st.session_state.selected_environment,
+                    new_var_key,
+                    new_var_value
+                )
+                st.rerun()
+        
+        # Display existing variables
+        for key, value in env_vars.items():
+            col1, col2, col3 = st.columns([2, 2, 1])
+            with col1:
+                st.text(key)
+            with col2:
+                st.text("*" * 8)
+            with col3:
+                if st.button("❌", key=f"delete_{key}"):
+                    st.session_state.collection_manager.delete_environment_variable(
+                        st.session_state.selected_environment,
+                        key
+                    )
+                    st.rerun()
+    
+    # Main content area
     current_tab, history_tab = st.tabs(["New Request", "Request History"])
     
     with current_tab:
