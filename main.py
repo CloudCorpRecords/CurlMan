@@ -51,8 +51,29 @@ def main():
     st.title("🔍 API Testing Studio")
     
     # Sidebar for collections and environments
+    # Responsive sidebar width
+    sidebar_width = 350 if st.session_state.get('expand_sidebar', True) else 200
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stSidebar"][aria-expanded="true"] > div:first-child {{
+            width: {sidebar_width}px;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+    
     with st.sidebar:
-        st.header("📚 Collections")
+        # Add toggle for sidebar width
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.header("📚 Collections")
+        with col2:
+            if st.button("↔️"):
+                st.session_state.expand_sidebar = not st.session_state.get('expand_sidebar', True)
+                st.rerun()
+                
         collections = st.session_state.collection_manager.list_collections()
         selected_collection = st.selectbox(
             "Select Collection",
@@ -110,17 +131,18 @@ def main():
             if not categorized:
                 categorized_vars["Other"].append(key)
         
-        # Add new variable
-        st.markdown("### Add New Variable")
-        new_var_col1, new_var_col2, new_var_col3, new_var_col4 = st.columns([2, 2, 1, 1])
-        with new_var_col1:
-            new_var_key = st.text_input("Variable Name")
-        with new_var_col2:
-            new_var_value = st.text_input("Value", type="password")
-        with new_var_col3:
-            new_var_category = st.selectbox("Category", list(categories.keys()))
-        with new_var_col4:
-            if st.button("Add Variable") and new_var_key:
+        # Compact Add Variable UI
+        with st.expander("➕ Add New Variable", expanded=False):
+            var_form = st.form("new_variable_form")
+            new_var_col1, new_var_col2 = var_form.columns([1, 1])
+            with new_var_col1:
+                new_var_key = st.text_input("Variable Name", key="new_var_key")
+                new_var_category = st.selectbox("Category", list(categories.keys()), key="new_var_cat")
+            with new_var_col2:
+                new_var_value = st.text_input("Value", type="password", key="new_var_value")
+                submit_button = st.form_submit_button("Add Variable")
+                
+            if submit_button and new_var_key:
                 st.session_state.collection_manager.set_environment_variable(
                     st.session_state.selected_environment,
                     new_var_key,
@@ -625,18 +647,27 @@ def main():
                         other_id = [id for id in st.session_state.compare_selections if id != entry['id']][0]
                         other_entry = next(e for e in st.session_state.request_history if e['id'] == other_id)
                         
-                        # Comparison metrics
-                        metrics_col1, metrics_col2 = st.columns(2)
-                        with metrics_col1:
-                            st.markdown(f"### Request A (ID: {entry['id']})")
-                            st.metric("Status Code", entry['status_code'])
-                            st.metric("Response Time", f"{entry['execution_time']:.2f}ms")
-                            st.metric("Method", entry['method'])
-                        with metrics_col2:
-                            st.markdown(f"### Request B (ID: {other_id})")
-                            st.metric("Status Code", other_entry['status_code'])
-                            st.metric("Response Time", f"{other_entry['execution_time']:.2f}ms")
-                            st.metric("Method", other_entry['method'])
+                        # Compact comparison metrics with better responsive layout
+                        st.markdown("### Request Comparison")
+                        metrics_container = st.container()
+                        with metrics_container:
+                            metric_cols = st.columns(6)
+                            
+                            # Request A metrics
+                            with metric_cols[0]:
+                                st.markdown(f"**A (ID: {entry['id']})**")
+                            with metric_cols[1]:
+                                st.metric("Status", entry['status_code'])
+                            with metric_cols[2]:
+                                st.metric("Time", f"{entry['execution_time']:.0f}ms")
+                                
+                            # Request B metrics
+                            with metric_cols[3]:
+                                st.markdown(f"**B (ID: {other_id})**")
+                            with metric_cols[4]:
+                                st.metric("Status", other_entry['status_code'])
+                            with metric_cols[5]:
+                                st.metric("Time", f"{other_entry['execution_time']:.0f}ms")
                         
                         # Response comparison
                         st.markdown("### Response Comparison")
