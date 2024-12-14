@@ -81,14 +81,46 @@ def main():
         st.subheader("Environment Variables")
         env_vars = st.session_state.collection_manager.get_environment(st.session_state.selected_environment)
         
+        with st.expander("About Environment Variables", expanded=False):
+            st.markdown("""
+            Use environment variables to store and reuse values across requests.
+            Reference variables in your requests using `${VARIABLE_NAME}` syntax.
+            
+            Example:
+            ```
+            curl https://api.example.com/data -H 'Authorization: Bearer ${API_TOKEN}'
+            ```
+            """)
+        
+        # Organize variables by category
+        categories = {
+            "Authentication": ["token", "key", "secret", "auth", "api"],
+            "URLs": ["url", "host", "endpoint", "domain"],
+            "Other": []
+        }
+        
+        categorized_vars = {cat: [] for cat in categories.keys()}
+        for key in env_vars.keys():
+            categorized = False
+            for cat, patterns in categories.items():
+                if any(pattern in key.lower() for pattern in patterns):
+                    categorized_vars[cat].append(key)
+                    categorized = True
+                    break
+            if not categorized:
+                categorized_vars["Other"].append(key)
+        
         # Add new variable
-        col1, col2, col3 = st.columns([2, 2, 1])
-        with col1:
-            new_var_key = st.text_input("Key")
-        with col2:
+        st.markdown("### Add New Variable")
+        new_var_col1, new_var_col2, new_var_col3, new_var_col4 = st.columns([2, 2, 1, 1])
+        with new_var_col1:
+            new_var_key = st.text_input("Variable Name")
+        with new_var_col2:
             new_var_value = st.text_input("Value", type="password")
-        with col3:
-            if st.button("Add") and new_var_key:
+        with new_var_col3:
+            new_var_category = st.selectbox("Category", list(categories.keys()))
+        with new_var_col4:
+            if st.button("Add Variable") and new_var_key:
                 st.session_state.collection_manager.set_environment_variable(
                     st.session_state.selected_environment,
                     new_var_key,
@@ -96,20 +128,38 @@ def main():
                 )
                 st.rerun()
         
-        # Display existing variables
-        for key, value in env_vars.items():
-            col1, col2, col3 = st.columns([2, 2, 1])
-            with col1:
-                st.text(key)
-            with col2:
-                st.text("*" * 8)
-            with col3:
-                if st.button("❌", key=f"delete_{key}"):
-                    st.session_state.collection_manager.delete_environment_variable(
-                        st.session_state.selected_environment,
-                        key
-                    )
-                    st.rerun()
+        # Display variables by category
+        for category, vars in categorized_vars.items():
+            if vars:  # Only show categories with variables
+                st.markdown(f"### {category}")
+                for key in vars:
+                    col1, col2, col3, col4 = st.columns([2, 2, 1, 1])
+                    with col1:
+                        st.text(key)
+                    with col2:
+                        value_hidden = st.text_input(
+                            "Value",
+                            value=env_vars[key],
+                            type="password",
+                            key=f"value_{key}",
+                            label_visibility="collapsed"
+                        )
+                        if value_hidden != env_vars[key]:
+                            st.session_state.collection_manager.set_environment_variable(
+                                st.session_state.selected_environment,
+                                key,
+                                value_hidden
+                            )
+                    with col3:
+                        if st.button("👁️", key=f"show_{key}"):
+                            st.text(env_vars[key])
+                    with col4:
+                        if st.button("❌", key=f"delete_{key}"):
+                            st.session_state.collection_manager.delete_environment_variable(
+                                st.session_state.selected_environment,
+                                key
+                            )
+                            st.rerun()
     
     # Main content area
     current_tab, history_tab = st.tabs(["New Request", "Request History"])
@@ -575,13 +625,49 @@ def main():
                         other_id = [id for id in st.session_state.compare_selections if id != entry['id']][0]
                         other_entry = next(e for e in st.session_state.request_history if e['id'] == other_id)
                         
-                        col1, col2 = st.columns(2)
-                        with col1:
-                            st.markdown(f"**Current Request ({entry['id']})**")
-                            st.json(entry['response_info'])
-                        with col2:
-                            st.markdown(f"**Compared Request ({other_id})**")
-                            st.json(other_entry['response_info'])
+                        # Comparison metrics
+                        metrics_col1, metrics_col2 = st.columns(2)
+                        with metrics_col1:
+                            st.markdown(f"### Request A (ID: {entry['id']})")
+                            st.metric("Status Code", entry['status_code'])
+                            st.metric("Response Time", f"{entry['execution_time']:.2f}ms")
+                            st.metric("Method", entry['method'])
+                        with metrics_col2:
+                            st.markdown(f"### Request B (ID: {other_id})")
+                            st.metric("Status Code", other_entry['status_code'])
+                            st.metric("Response Time", f"{other_entry['execution_time']:.2f}ms")
+                            st.metric("Method", other_entry['method'])
+                        
+                        # Response comparison
+                        st.markdown("### Response Comparison")
+                        compare_tabs = st.tabs(["Headers", "Response Body", "Timing"])
+                        
+                        with compare_tabs[0]:
+                            headers_col1, headers_col2 = st.columns(2)
+                            with headers_col1:
+                                st.markdown("**Request A Headers**")
+                                st.json(entry['request_info']['headers'])
+                            with headers_col2:
+                                st.markdown("**Request B Headers**")
+                                st.json(other_entry['request_info']['headers'])
+                        
+                        with compare_tabs[1]:
+                            body_col1, body_col2 = st.columns(2)
+                            with body_col1:
+                                st.markdown("**Request A Response**")
+                                st.json(entry['response_info'].get('content', {}))
+                            with body_col2:
+                                st.markdown("**Request B Response**")
+                                st.json(other_entry['response_info'].get('content', {}))
+                        
+                        with compare_tabs[2]:
+                            timing_col1, timing_col2 = st.columns(2)
+                            with timing_col1:
+                                st.markdown("**Request A Timing**")
+                                st.json(entry['response_info']['metadata']['timing'])
+                            with timing_col2:
+                                st.markdown("**Request B Timing**")
+                                st.json(other_entry['response_info']['metadata']['timing'])
                     
                     tabs = st.tabs(["Request Info", "Response Info", "Analysis"])
                     with tabs[0]:

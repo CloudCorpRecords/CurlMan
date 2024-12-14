@@ -117,3 +117,11 @@ class CollectionManager:
         if env_name in self.environments and key in self.environments[env_name]:
             del self.environments[env_name][key]
             self.save_environments()
+
+    def interpolate_variables(self, text: str, environment: str) -> str:
+        """Replace environment variables in text with their values."""
+        env_vars = self.environments.get(environment, {})
+        for key, value in env_vars.items():
+            text = text.replace(f"{{${key}}}", value)
+        return text
+
