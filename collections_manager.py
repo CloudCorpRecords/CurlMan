@@ -76,14 +76,30 @@ class CollectionManager:
                 return collection
         return None
 
-    def add_request_to_collection(self, collection_name: str, request_data: dict):
-        """Add a request to a collection."""
+    def add_request_to_collection(self, collection_name: str, request_data: dict, name: str = "", description: str = ""):
+        """Add a request to a collection with optional name and description."""
         collection = self.get_collection(collection_name)
         if collection:
-            request_data["added_at"] = datetime.now().isoformat()
-            collection.requests.append(request_data)
+            request_entry = {
+                "name": name or f"Request {len(collection.requests) + 1}",
+                "description": description,
+                "request_data": request_data,
+                "added_at": datetime.now().isoformat(),
+                "last_used": datetime.now().isoformat(),
+                "tags": []
+            }
+            collection.requests.append(request_entry)
             collection.updated_at = datetime.now().isoformat()
             self.save_collection(collection)
+            
+    def get_request_template(self, collection_name: str, request_name: str) -> Optional[dict]:
+        """Get a request template by name from a collection."""
+        collection = self.get_collection(collection_name)
+        if collection:
+            for request in collection.requests:
+                if request["name"] == request_name:
+                    return request["request_data"]
+        return None
 
     def get_environment(self, name: str) -> Dict:
         """Get environment variables for a specific environment."""

@@ -121,11 +121,46 @@ def main():
         """)
 
     # Input area
-    curl_command = st.text_area(
-        "Enter curl command",
-        height=100,
-        placeholder="curl https://api.example.com/data -H 'Authorization: Bearer token'"
-    )
+    # Request input area
+    input_col1, input_col2 = st.columns([3, 1])
+    with input_col1:
+        if selected_collection:
+            # Get templates from collection
+            collection = st.session_state.collection_manager.get_collection(selected_collection)
+            if collection and collection.requests:
+                templates = [req["name"] for req in collection.requests]
+                selected_template = st.selectbox(
+                    "Load from template",
+                    [""] + templates,
+                    format_func=lambda x: "New Request" if x == "" else x
+                )
+                if selected_template:
+                    template_data = st.session_state.collection_manager.get_request_template(
+                        selected_collection, selected_template
+                    )
+                    if template_data:
+                        curl_command = template_data.get("curl_command", "")
+                    else:
+                        curl_command = ""
+                else:
+                    curl_command = ""
+            else:
+                curl_command = ""
+        else:
+            curl_command = ""
+            
+        curl_command = st.text_area(
+            "Enter curl command",
+            value=curl_command,
+            height=100,
+            placeholder="curl https://api.example.com/data -H 'Authorization: Bearer token'"
+        )
+    
+    with input_col2:
+        save_template = st.checkbox("Save as template")
+        if save_template and selected_collection:
+            template_name = st.text_input("Template name")
+            template_desc = st.text_input("Description (optional)")
 
     if st.button("Analyze", type="primary"):
         if not curl_command:
@@ -147,6 +182,20 @@ def main():
 
                 # Save to history
                 save_to_history(curl_command, request_info, response_info)
+                
+                # Save as template if requested
+                if save_template and selected_collection and template_name:
+                    st.session_state.collection_manager.add_request_to_collection(
+                        selected_collection,
+                        {
+                            "curl_command": curl_command,
+                            "request_info": request_info,
+                            "response_info": response_info
+                        },
+                        name=template_name,
+                        description=template_desc
+                    )
+                    st.success(f"Saved template '{template_name}' to collection '{selected_collection}'")
                 
                 # Display results in tabs
                 tab1, tab2, tab3, tab4, tab5 = st.tabs(["Request Details", "Response Details", "Raw Data", "Export Data", "AI Analysis"]) # Added a new tab
