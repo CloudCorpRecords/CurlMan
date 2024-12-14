@@ -9,10 +9,12 @@ def format_data(data: Any, content_type: str) -> str:
     if isinstance(data, str):
         if 'application/json' in content_type:
             try:
-                parsed = json.loads(data)
+                # Strip any leading/trailing whitespace
+                cleaned_data = data.strip()
+                parsed = json.loads(cleaned_data)
                 return json.dumps(parsed, indent=2, sort_keys=True)
-            except:
-                return data
+            except json.JSONDecodeError as e:
+                return f"Invalid JSON: {str(e)}\nRaw data: {data}"
         elif 'application/xml' in content_type or 'text/xml' in content_type:
             try:
                 return xml.dom.minidom.parseString(data).toprettyxml(indent="  ")
