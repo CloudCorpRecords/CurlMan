@@ -125,3 +125,75 @@ class CollectionManager:
             text = text.replace(f"{{${key}}}", value)
         return text
 
+    def create_folder(self, collection_name: str, folder_name: str, parent_folder: str = None) -> bool:
+        """Create a new folder in the collection."""
+        collection = self.collections.get(collection_name)
+        if not collection:
+            return False
+            
+        if 'folders' not in collection:
+            collection['folders'] = {}
+            
+        folder_path = f"{parent_folder}/{folder_name}" if parent_folder else folder_name
+        collection['folders'][folder_path] = {
+            'name': folder_name,
+            'parent': parent_folder,
+            'requests': []
+        }
+        self.save_collections()
+        return True
+        
+    def add_request_to_folder(self, collection_name: str, folder_path: str, request_data: dict,
+                            name: str = None, description: str = None, tags: list = None) -> bool:
+        """Add a request to a specific folder in a collection."""
+        collection = self.collections.get(collection_name)
+        if not collection or 'folders' not in collection or folder_path not in collection['folders']:
+            return False
+            
+        request = {
+            'name': name or f"Request {len(collection['folders'][folder_path]['requests']) + 1}",
+            'description': description or "",
+            'tags': tags or [],
+            'curl_command': request_data.get('curl_command', ''),
+            'request_info': request_data.get('request_info', {}),
+            'response_info': request_data.get('response_info', {}),
+            'created_at': datetime.now().isoformat(),
+            'updated_at': datetime.now().isoformat()
+        }
+        
+        collection['folders'][folder_path]['requests'].append(request)
+        self.save_collections()
+        return True
+        
+    def export_collection(self, collection_name: str) -> dict:
+        """Export a collection with all its data."""
+        collection = self.collections.get(collection_name)
+        if not collection:
+            return None
+            
+        return {
+            'name': collection_name,
+            'folders': collection.get('folders', {}),
+            'requests': collection.get('requests', []),
+            'created_at': collection.get('created_at', datetime.now().isoformat()),
+            'updated_at': datetime.now().isoformat()
+        }
+        
+    def import_collection(self, collection_data: dict) -> bool:
+        """Import a collection from exported data."""
+        if not collection_data or 'name' not in collection_data:
+            return False
+            
+        name = collection_data['name']
+        if name in self.collections:
+            name = f"{name}_imported_{int(time.time())}"
+            
+        self.collections[name] = {
+            'folders': collection_data.get('folders', {}),
+            'requests': collection_data.get('requests', []),
+            'created_at': collection_data.get('created_at', datetime.now().isoformat()),
+            'updated_at': datetime.now().isoformat()
+        }
+        self.save_collections()
+        return True
+
