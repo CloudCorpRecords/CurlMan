@@ -822,7 +822,18 @@ def main():
         except Exception as e:
             st.error(f"Error analyzing curl command: {str(e)}")
     
-    with history_tab:
+    # Side Navigation
+    pages = {
+        "Request Builder": "🔧",
+        "Collections": "📁",
+        "History": "📜",
+        "WebSocket Testing": "🔌",
+        "GraphQL": "🔮"
+    }
+    
+    page = st.sidebar.radio("Navigation", pages.keys(), format_func=lambda x: f"{pages[x]} {x}")
+    
+    if page == "History":
         st.subheader("📜 Request History")
         if not st.session_state.request_history:
             st.info("No requests have been made yet. Your request history will appear here.")
