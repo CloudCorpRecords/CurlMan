@@ -573,6 +573,88 @@ def main():
 
                         with tab6:
                             st.header("🔮 GraphQL Query Builder")
+
+                        with tab7:
+                            st.header("🔌 WebSocket Testing")
+                            
+                            # Initialize WebSocket handler if not exists
+                            if 'websocket_handler' not in st.session_state:
+                                from websocket_handler import WebSocketHandler
+                                st.session_state.websocket_handler = WebSocketHandler()
+
+                            # Connection Configuration
+                            st.subheader("WebSocket Connection")
+                            
+                            ws_url = st.text_input(
+                                "WebSocket URL",
+                                placeholder="ws://example.com/websocket",
+                                help="Enter the WebSocket URL (ws:// or wss://)"
+                            )
+                            
+                            # Headers Configuration
+                            with st.expander("Headers (Optional)", expanded=False):
+                                header_list = []
+                                for i in range(5):  # Allow up to 5 headers
+                                    col1, col2 = st.columns(2)
+                                    with col1:
+                                        key = st.text_input(f"Header Key {i+1}", key=f"ws_header_key_{i}")
+                                    with col2:
+                                        value = st.text_input(f"Header Value {i+1}", key=f"ws_header_val_{i}")
+                                    if key and value:
+                                        header_list.append((key, value))
+                            
+                            # Connection Controls
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                if st.button("Connect", disabled=not ws_url):
+                                    st.session_state.websocket_handler = WebSocketHandler()
+                                    headers = dict(header_list) if header_list else None
+                                    
+                                    async def connect():
+                                        return await st.session_state.websocket_handler.connect(ws_url, headers)
+                                        
+                                    success = asyncio.run(connect())
+                                    if success:
+                                        st.success("Connected successfully!")
+                                    else:
+                                        st.error("Connection failed. Check the URL and try again.")
+                            
+                            with col2:
+                                if st.button("Disconnect"):
+                                    async def disconnect():
+                                        await st.session_state.websocket_handler.disconnect()
+                                    
+                                    asyncio.run(disconnect())
+                                    st.success("Disconnected successfully!")
+                            
+                            # Message Sending
+                            st.subheader("Send Message")
+                            message = st.text_area("Message Content", placeholder="Enter your message here")
+                            if st.button("Send", disabled=not message or not st.session_state.websocket_handler.is_connected):
+                                async def send_message():
+                                    return await st.session_state.websocket_handler.send_message(message)
+                                
+                                success = asyncio.run(send_message())
+                                if success:
+                                    st.success("Message sent successfully!")
+                                else:
+                                    st.error("Failed to send message. Check connection.")
+                            
+                            # Message History
+                            st.subheader("Message History")
+                            if st.button("Clear History"):
+                                st.session_state.websocket_handler.clear_message_history()
+                                st.rerun()
+                            
+                            messages = st.session_state.websocket_handler.get_message_history()
+                            if not messages:
+                                st.info("No messages yet. Connect to a WebSocket server and start sending messages!")
+                            else:
+                                for msg in messages:
+                                    direction = "➡️" if msg['direction'] == 'sent' else "⬅️"
+                                    with st.container():
+                                        st.markdown(f"**{direction} {msg['timestamp']}**")
+                                        st.code(msg['content'], language="json")
                             
                             # Introduction Section with clear guidance
                             st.markdown("""
