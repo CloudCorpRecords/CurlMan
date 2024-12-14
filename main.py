@@ -573,9 +573,18 @@ def main():
 
                         with tab6:
                             st.header("🔮 GraphQL Query Builder")
+                            
+                            # Introduction Section with clear guidance
                             st.markdown("""
-                            Build and test GraphQL queries with an interactive builder. 
-                            Enter your GraphQL endpoint and construct queries step by step.
+                            ### Welcome to the GraphQL Query Builder!
+                            
+                            This tool helps you build and test GraphQL queries without writing complex code. Here's what you can do:
+                            
+                            1. **Configure Your Request**: Enter your GraphQL endpoint URL
+                            2. **Build Your Query**: Add fields and customize your query structure
+                            3. **Execute & Test**: Run your query and see the results instantly
+                            
+                            Let's get started! 👇
                             """)
                             
                             # Initialize GraphQL handler and state if not exists
@@ -585,43 +594,78 @@ def main():
                                 st.session_state.query_builder = []
                             
                             # GraphQL Configuration Section
-                            st.subheader("1. Configure GraphQL Request")
+                            st.markdown("---")
+                            st.subheader("📝 Step 1: Configure Your GraphQL Request")
+                            
                             with st.container():
+                                st.markdown("""
+                                First, set up your GraphQL request by providing the endpoint and basic configuration.
+                                Try our example endpoint or use your own GraphQL API.
+                                """)
+                                
                                 col1, col2 = st.columns([2, 1])
                                 with col1:
                                     graphql_endpoint = st.text_input(
-                                        "GraphQL Endpoint",
+                                        "GraphQL Endpoint URL",
                                         placeholder="https://api.example.com/graphql",
-                                        help="Enter the URL of your GraphQL endpoint"
+                                        help="Enter your GraphQL API endpoint (e.g., https://api.github.com/graphql)"
                                     )
                                 with col2:
                                     operation_type = st.selectbox(
                                         "Operation Type",
                                         ["Query", "Mutation"],
                                         key="graphql_operation_type",
-                                        help="Choose the type of GraphQL operation"
+                                        help="Query: Fetch data\nMutation: Modify data"
                                     )
                                 
                                 operation_name = st.text_input(
                                     "Operation Name (Optional)",
                                     placeholder="MyQuery",
-                                    help="Give your operation a name (e.g., GetUserProfile)"
+                                    help="A descriptive name for your operation (e.g., GetUserProfile, UpdateUserData)"
                                 )
+                                
+                                st.info("💡 Tip: Start with a simple query to test your endpoint connection.")
                             
                             # Dynamic field builder
-                            st.subheader("Build Query")
-                            with st.expander("Add Field", expanded=True):
-                                field_col1, field_col2 = st.columns([2, 1])
-                                with field_col1:
-                                    field_name = st.text_input("Field Name")
-                                with field_col2:
-                                    has_subfields = st.checkbox("Has Subfields")
+                            st.markdown("---")
+                            st.subheader("🏗️ Step 2: Build Your Query")
+                            
+                            with st.container():
+                                st.markdown("""
+                                Now, let's build your GraphQL query by adding fields. Each field represents a piece of data you want to request.
                                 
-                                if has_subfields:
-                                    subfields = st.text_area(
-                                        "Subfields (one per line)",
-                                        placeholder="id\nname\ncreatedAt"
-                                    )
+                                **Example Structure:**
+                                ```graphql
+                                query {
+                                  user {
+                                    id
+                                    name
+                                    email
+                                  }
+                                }
+                                ```
+                                """)
+                                
+                                with st.expander("➕ Add New Field", expanded=True):
+                                    field_col1, field_col2 = st.columns([2, 1])
+                                    with field_col1:
+                                        field_name = st.text_input(
+                                            "Field Name",
+                                            placeholder="user",
+                                            help="Enter the name of the field you want to query (e.g., user, posts, comments)"
+                                        )
+                                    with field_col2:
+                                        has_subfields = st.checkbox(
+                                            "Has Nested Fields",
+                                            help="Check this if your field contains nested data (e.g., user has name, email, etc.)"
+                                        )
+                                    
+                                    if has_subfields:
+                                        subfields = st.text_area(
+                                            "Nested Fields (one per line)",
+                                            placeholder="id\nname\nemail\ncreatedAt",
+                                            help="Enter each nested field on a new line"
+                                        )
                                 
                                 # Arguments
                                 has_args = st.checkbox("Add Arguments")
