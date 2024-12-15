@@ -370,7 +370,76 @@ def analyze_request_view():
                 
                 with tab2:
                     st.subheader("Response Details")
-                    st.json(response_info)
+                    
+                    # Response Overview
+                    st.markdown("### 📊 Response Overview")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Status Code", response_info['status_code'])
+                    with col2:
+                        st.metric("Response Size", response_info['metadata']['size'])
+                    with col3:
+                        st.metric("Total Time", response_info['metadata']['timing']['total_time'])
+                    
+                    # Timing Metrics
+                    st.markdown("### ⏱️ Timing Analysis")
+                    timing_data = response_info['metadata']['timing']
+                    timing_cols = st.columns(3)
+                    with timing_cols[0]:
+                        st.metric("DNS Lookup", timing_data.get('dns_lookup', 'N/A'))
+                        st.metric("Connect Time", timing_data.get('connect_time', 'N/A'))
+                    with timing_cols[1]:
+                        st.metric("TLS Handshake", timing_data.get('tls_handshake', 'N/A'))
+                        st.metric("Request Time", timing_data.get('request_time', 'N/A'))
+                    with timing_cols[2]:
+                        st.metric("Processing Time", timing_data.get('processing_time', 'N/A'))
+                        st.metric("Server Time", timing_data.get('server_time', 'N/A'))
+                    
+                    # Performance Metrics
+                    st.markdown("### 🚀 Performance Analysis")
+                    perf_metrics = response_info['metadata']['performance_metrics']
+                    st.metric("Performance Score", f"{perf_metrics['total_score']}/100")
+                    
+                    # Performance Details
+                    perf_cols = st.columns(3)
+                    with perf_cols[0]:
+                        st.markdown("**Compression:**")
+                        st.markdown("✅" if perf_metrics['compression_enabled'] else "❌")
+                    with perf_cols[1]:
+                        st.markdown("**Connection Reused:**")
+                        st.markdown("✅" if perf_metrics['connection_reused'] else "❌")
+                    with perf_cols[2]:
+                        st.markdown("**Response Size:**")
+                        st.markdown(perf_metrics['response_size'])
+                    
+                    # Performance Recommendations
+                    if perf_metrics.get('recommendations'):
+                        st.markdown("#### Performance Recommendations")
+                        for rec in perf_metrics['recommendations']:
+                            st.info(f"💡 {rec}")
+                    
+                    # Security Analysis
+                    st.markdown("### 🔒 Security Analysis")
+                    security = response_info['metadata']['security_analysis']
+                    for header, info in security.items():
+                        with st.expander(f"{'✅' if info['present'] else '❌'} {header}"):
+                            st.markdown(f"**Description:** {info['description']}")
+                            if info['present'] and 'value' in info:
+                                st.code(info['value'])
+                    
+                    # Response Headers
+                    st.markdown("### 📋 Response Headers")
+                    with st.expander("View All Headers"):
+                        for header, value in response_info['headers'].items():
+                            st.markdown(f"**{header}:** {value}")
+                    
+                    # Response Content
+                    st.markdown("### 📄 Response Content")
+                    content_type = response_info.get('content_type', 'text/plain')
+                    if 'application/json' in content_type:
+                        st.json(response_info['content'])
+                    else:
+                        st.code(response_info['raw'], language='text')
         except Exception as e:
             st.error(f"Error analyzing request: {str(e)}")
 
