@@ -271,7 +271,69 @@ def analyze_request_view():
                 
                 with tab1:
                     st.subheader("Request Analysis")
-                    st.json(request_info)
+                    
+                    # Security Score
+                    score = request_info.get('security_score', {})
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.metric("Security Score", f"{score.get('score', 0)}/100")
+                    with col2:
+                        grade = score.get('grade', 'N/A')
+                        st.metric("Security Grade", grade, 
+                                delta="Good" if grade in ['A', 'B'] else "Needs Improvement")
+                    
+                    # URL Analysis
+                    st.subheader("URL Analysis")
+                    url_analysis = request_info['url_analysis']
+                    cols = st.columns(2)
+                    with cols[0]:
+                        st.markdown(f"**Protocol:** {url_analysis['scheme']}")
+                        st.markdown(f"**Host:** {url_analysis['host']}")
+                        st.markdown(f"**Path:** {url_analysis['path']}")
+                    with cols[1]:
+                        st.markdown("**Security Status:**")
+                        st.markdown("✅" if url_analysis['security']['uses_https'] else "⚠️" + " HTTPS")
+                        if url_analysis['security']['has_sensitive_params']:
+                            st.warning("⚠️ Sensitive data detected in URL parameters")
+                    
+                    # Authentication
+                    st.subheader("Authentication")
+                    auth_info = request_info['authentication']
+                    if auth_info['present']:
+                        st.success(f"✅ {auth_info['type']} (Security Level: {auth_info['security_level'].title()})")
+                    else:
+                        st.warning("⚠️ No authentication detected")
+                    
+                    # Headers Analysis
+                    st.subheader("Headers Analysis")
+                    headers_analysis = request_info['headers']['security_analysis']
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Security Headers:**")
+                        for header, present in headers_analysis['security_headers'].items():
+                            st.markdown(f"{'✅' if present else '❌'} {header}")
+                    with col2:
+                        st.markdown("**Standard Headers:**")
+                        st.markdown(f"{'✅' if headers_analysis['content_type_secure'] else '❌'} Content-Type")
+                        st.markdown(f"{'✅' if headers_analysis['accepts_secure'] else '❌'} Accept")
+                        st.markdown(f"{'✅' if headers_analysis['cors_present'] else '❌'} CORS Headers")
+                    
+                    # Request Body
+                    if request_info.get('body', {}).get('present'):
+                        st.subheader("Request Body")
+                        body_info = request_info['body']
+                        st.markdown(f"**Content Type:** {body_info['content_type']}")
+                        st.markdown(f"**Size:** {body_info['size_bytes']} bytes")
+                        if body_info['security_analysis']['contains_sensitive_data']:
+                            st.warning("⚠️ Potentially sensitive data detected in request body")
+                        if body_info['security_analysis']['size_warning']:
+                            st.warning("⚠️ Large request body detected")
+                    
+                    # Security Recommendations
+                    if score.get('recommendations'):
+                        st.subheader("Security Recommendations")
+                        for rec in score['recommendations']:
+                            st.info(f"💡 {rec}")
                 
                 with tab2:
                     st.subheader("Response Details")
