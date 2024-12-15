@@ -604,23 +604,6 @@ def main():
         graphql_view()
     elif current_view == "collections":
         collections_view()
-    
-    # Documentation Generation Button in sidebar
-    st.sidebar.markdown("---")
-    if st.sidebar.button("📚 Generate API Docs"):
-        try:
-            from api_documentation import generate_documentation
-            generate_documentation()
-            st.sidebar.success("API documentation generated successfully!")
-            
-            # Show links to the generated docs
-            st.sidebar.markdown("""
-            Documentation generated:
-            - [API Documentation (Markdown)](docs/API.md)
-            - [API Documentation (JSON)](docs/api_documentation.json)
-            """)
-        except Exception as e:
-            st.sidebar.error(f"Error generating documentation: {str(e)}")
 
 if __name__ == "__main__":
     main()
