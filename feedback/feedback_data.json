@@ -1,3 +1,18 @@
 {
-  "feedback_entries": []
+  "feedback_entries": [
+    {
+      "id": "f555bfa7-9a17-4cac-a275-33e2a5221a7d",
+      "timestamp": "2024-12-15T00:54:04.935086",
+      "category": "general_feedback",
+      "description": "test",
+      "environment": {
+        "browser": "Web Browser",
+        "app_version": "1.0.0"
+      },
+      "contact": {
+        "email": "admin@reneturcios.com"
+      },
+      "status": "new"
+    }
+  ]
 }
