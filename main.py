@@ -307,16 +307,49 @@ def analyze_request_view():
                     # Headers Analysis
                     st.subheader("Headers Analysis")
                     headers_analysis = request_info['headers']['security_analysis']
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.markdown("**Security Headers:**")
-                        for header, present in headers_analysis['security_headers'].items():
-                            st.markdown(f"{'✅' if present else '❌'} {header}")
-                    with col2:
-                        st.markdown("**Standard Headers:**")
-                        st.markdown(f"{'✅' if headers_analysis['content_type_secure'] else '❌'} Content-Type")
-                        st.markdown(f"{'✅' if headers_analysis['accepts_secure'] else '❌'} Accept")
-                        st.markdown(f"{'✅' if headers_analysis['cors_present'] else '❌'} CORS Headers")
+                    
+                    # Security Score
+                    st.metric("Headers Security Score", f"{headers_analysis['security_score']}/100")
+                    
+                    # Security Headers
+                    st.markdown("### Security Headers")
+                    for header, info in headers_analysis['security_headers'].items():
+                        with st.expander(f"{'✅' if info['present'] else '❌'} {header}"):
+                            st.markdown(f"**Description:** {info['description']}")
+                            if info['present']:
+                                if 'valid' in info:
+                                    st.markdown(f"**Valid Configuration:** {'✅' if info['valid'] else '❌'}")
+                            else:
+                                st.markdown(f"**Recommendation:** {info['recommendation']}")
+                    
+                    # Content Security
+                    st.markdown("### Content Headers")
+                    for header, info in headers_analysis['content_security'].items():
+                        col1, col2 = st.columns(2)
+                        with col1:
+                            st.markdown(f"**{header.title()}:** {'✅' if info['present'] else '❌'}")
+                        with col2:
+                            if info['present']:
+                                st.markdown(f"Value: `{info['value']}`")
+                    
+                    # CORS Configuration
+                    if headers_analysis['cors_configuration']['enabled']:
+                        st.markdown("### CORS Configuration")
+                        cors_headers = headers_analysis['cors_configuration']['headers']
+                        for header, value in cors_headers.items():
+                            if value:
+                                st.markdown(f"**{header}:** `{value}`")
+                    
+                    # Cache Configuration
+                    st.markdown("### Cache Configuration")
+                    cache_info = headers_analysis['cache_configuration']
+                    if cache_info['present']:
+                        st.markdown(f"**Cache-Control:** `{cache_info['value']}`")
+                        st.markdown("**Security Features:**")
+                        st.markdown(f"- No Store: {'✅' if cache_info['no_store'] else '❌'}")
+                        st.markdown(f"- Private: {'✅' if cache_info['private'] else '❌'}")
+                    else:
+                        st.warning(cache_info['recommendation'])
                     
                     # Request Body
                     if request_info.get('body', {}).get('present'):

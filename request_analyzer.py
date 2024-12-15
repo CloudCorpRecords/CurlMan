@@ -83,19 +83,82 @@ def _check_sensitive_params(query_string: str) -> bool:
               for param in params)
 
 def _analyze_request_headers(headers: dict) -> dict:
-    """Analyze request headers for security and best practices."""
-    security_analysis = {
-        "content_type_secure": "content-type" in headers,
-        "accepts_secure": "accept" in headers,
-        "cors_present": "origin" in headers,
-        "cache_control": "cache-control" in headers,
-        "security_headers": {
-            "x-csrf-token": "x-csrf-token" in headers,
-            "x-xss-protection": "x-xss-protection" in headers,
-            "x-content-type-options": "x-content-type-options" in headers,
+    """Analyze request headers for security and best practices with detailed validation."""
+    headers_lower = {k.lower(): v for k, v in headers.items()}
+    
+    security_headers = {
+        "x-csrf-token": {
+            "present": "x-csrf-token" in headers_lower,
+            "description": "Prevents Cross-Site Request Forgery attacks",
+            "recommendation": "Add X-CSRF-Token header for forms/mutations"
+        },
+        "x-xss-protection": {
+            "present": "x-xss-protection" in headers_lower,
+            "valid": headers_lower.get("x-xss-protection", "") in ["1", "1; mode=block"],
+            "description": "Provides XSS filtering capabilities",
+            "recommendation": "Set X-XSS-Protection: 1; mode=block"
+        },
+        "x-content-type-options": {
+            "present": "x-content-type-options" in headers_lower,
+            "valid": headers_lower.get("x-content-type-options", "").lower() == "nosniff",
+            "description": "Prevents MIME type sniffing",
+            "recommendation": "Set X-Content-Type-Options: nosniff"
+        },
+        "strict-transport-security": {
+            "present": "strict-transport-security" in headers_lower,
+            "description": "Enforces HTTPS connections",
+            "recommendation": "Add Strict-Transport-Security header with appropriate max-age"
+        },
+        "x-frame-options": {
+            "present": "x-frame-options" in headers_lower,
+            "valid": headers_lower.get("x-frame-options", "").upper() in ["DENY", "SAMEORIGIN"],
+            "description": "Prevents clickjacking attacks",
+            "recommendation": "Set X-Frame-Options to DENY or SAMEORIGIN"
         }
     }
-    return security_analysis
+
+    content_security = {
+        "content_type": {
+            "present": "content-type" in headers_lower,
+            "value": headers_lower.get("content-type", ""),
+            "valid": bool(headers_lower.get("content-type", "")),
+            "recommendation": "Specify Content-Type header"
+        },
+        "accept": {
+            "present": "accept" in headers_lower,
+            "value": headers_lower.get("accept", ""),
+            "valid": bool(headers_lower.get("accept", "")),
+            "recommendation": "Specify Accept header for expected response format"
+        }
+    }
+
+    cors_config = {
+        "enabled": "origin" in headers_lower,
+        "headers": {
+            "origin": headers_lower.get("origin", ""),
+            "access-control-request-method": headers_lower.get("access-control-request-method", ""),
+            "access-control-request-headers": headers_lower.get("access-control-request-headers", "")
+        },
+        "recommendation": "Implement proper CORS headers for cross-origin requests"
+    }
+
+    cache_config = {
+        "present": "cache-control" in headers_lower,
+        "value": headers_lower.get("cache-control", ""),
+        "no_store": "no-store" in headers_lower.get("cache-control", "").lower(),
+        "private": "private" in headers_lower.get("cache-control", "").lower(),
+        "recommendation": "Set appropriate Cache-Control headers for sensitive data"
+    }
+
+    return {
+        "security_headers": security_headers,
+        "content_security": content_security,
+        "cors_configuration": cors_config,
+        "cache_configuration": cache_config,
+        "total_headers": len(headers),
+        "security_score": sum(1 for h in security_headers.values() if h["present"]) * 20,  # Score out of 100
+        "recommendations": [h["recommendation"] for h in security_headers.values() if not h["present"]]
+    }
 
 def _analyze_request_body(data: str) -> dict:
     """Analyze request body with enhanced security checks and format detection."""
