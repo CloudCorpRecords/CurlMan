@@ -524,7 +524,67 @@ def analyze_request_view():
 def main():
     st.title("🔍 API Testing Studio")
     
+    # Feedback Form in Sidebar
+    st.sidebar.markdown("---")
+    if st.sidebar.button("📝 Give Feedback", use_container_width=True):
+        st.session_state.show_feedback = True
+    
+    # Show feedback form
+    if st.session_state.get('show_feedback', False):
+        with st.sidebar.form("feedback_form"):
+            st.write("### Share Your Feedback")
+            category = st.selectbox(
+                "Feedback Type",
+                ["Bug Report", "Feature Request", "General Feedback"]
+            )
+            description = st.text_area("Your Feedback")
+            email = st.text_input("Email (optional)", key="feedback_email")
+            
+            if st.form_submit_button("Submit Feedback"):
+                try:
+                    import json
+                    from datetime import datetime
+                    import uuid
+                    import os
+                    
+                    feedback_entry = {
+                        "id": str(uuid.uuid4()),
+                        "timestamp": datetime.now().isoformat(),
+                        "category": category.lower().replace(" ", "_"),
+                        "description": description,
+                        "environment": {
+                            "browser": "Web Browser",
+                            "app_version": "1.0.0"
+                        },
+                        "contact": {"email": email} if email else {},
+                        "status": "new"
+                    }
+                    
+                    # Create feedback directory if it doesn't exist
+                    os.makedirs("feedback", exist_ok=True)
+                    
+                    # Load existing feedback
+                    feedback_file = "feedback/feedback_data.json"
+                    try:
+                        with open(feedback_file, 'r') as f:
+                            feedback_data = json.load(f)
+                    except (FileNotFoundError, json.JSONDecodeError):
+                        feedback_data = {"feedback_entries": []}
+                    
+                    # Add new feedback
+                    feedback_data["feedback_entries"].append(feedback_entry)
+                    
+                    # Save updated feedback
+                    with open(feedback_file, 'w') as f:
+                        json.dump(feedback_data, f, indent=2)
+                    
+                    st.sidebar.success("Thank you for your feedback!")
+                    st.session_state.show_feedback = False
+                except Exception as e:
+                    st.sidebar.error(f"Error saving feedback: {str(e)}")
+    
     # Main navigation
+    st.sidebar.markdown("---")
     nav_options = {
         "🔍 Request Analyzer": "analyzer",
         "📚 Collections": "collections",
