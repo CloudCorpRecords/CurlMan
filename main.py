@@ -398,46 +398,19 @@ def analyze_request_view():
                     # Performance Metrics
                     st.markdown("### 🚀 Performance Analysis")
                     perf_metrics = response_info['metadata']['performance_metrics']
+                    st.metric("Performance Score", f"{perf_metrics['total_score']}/100")
                     
-                    # Display various performance scores
-                    score_cols = st.columns(4)
-                    scores = perf_metrics.get('scores', {})
-                    with score_cols[0]:
-                        st.metric("Overall Score", f"{scores.get('total', 'N/A')}/100")
-                    with score_cols[1]:
-                        ttfb_score = scores.get('ttfb', 0)
-                        st.metric("TTFB Score", f"{ttfb_score:.1f}/100" if isinstance(ttfb_score, (int, float)) else "N/A")
-                    with score_cols[2]:
-                        network_score = scores.get('network', 0)
-                        st.metric("Network Score", f"{network_score:.1f}/100" if isinstance(network_score, (int, float)) else "N/A")
-                    with score_cols[3]:
-                        st.metric("Optimization Score", f"{scores.get('optimization', 'N/A')}/100")
-                    
-                    # Detailed Metrics
-                    st.markdown("#### 📊 Detailed Metrics")
-                    metric_cols = st.columns(3)
-                    with metric_cols[0]:
-                        st.markdown("**Time to First Byte:**")
-                        st.markdown(f"`{perf_metrics['metrics']['ttfb']}`")
-                        st.markdown("**Network Latency:**")
-                        st.markdown(f"`{perf_metrics['metrics']['network_latency']}`")
-                    with metric_cols[1]:
-                        st.markdown("**DNS Resolution:**")
-                        st.markdown(f"`{perf_metrics['metrics']['dns_time']}`")
-                        if 'tls_time' in perf_metrics['metrics']:
-                            st.markdown("**TLS Handshake:**")
-                            st.markdown(f"`{perf_metrics['metrics']['tls_time']}`")
-                    with metric_cols[2]:
-                        st.markdown("**Response Features:**")
-                        st.markdown("✅ Compression Enabled" if perf_metrics['compression_enabled'] else "❌ Compression Disabled")
-                        st.markdown("✅ Connection Reused" if perf_metrics['connection_reused'] else "❌ New Connection")
-                        st.markdown(f"📦 Size: {perf_metrics['response_size']}")
-                    
-                    # Performance Bottlenecks
-                    if perf_metrics.get('bottlenecks'):
-                        st.markdown("#### 🚨 Performance Bottlenecks")
-                        for bottleneck in perf_metrics['bottlenecks']:
-                            st.warning(bottleneck)
+                    # Performance Details
+                    perf_cols = st.columns(3)
+                    with perf_cols[0]:
+                        st.markdown("**Compression:**")
+                        st.markdown("✅" if perf_metrics['compression_enabled'] else "❌")
+                    with perf_cols[1]:
+                        st.markdown("**Connection Reused:**")
+                        st.markdown("✅" if perf_metrics['connection_reused'] else "❌")
+                    with perf_cols[2]:
+                        st.markdown("**Response Size:**")
+                        st.markdown(perf_metrics['response_size'])
                     
                     # Performance Recommendations
                     if perf_metrics.get('recommendations'):

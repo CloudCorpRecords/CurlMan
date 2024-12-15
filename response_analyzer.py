@@ -122,135 +122,51 @@ def analyze_response(request_data: dict) -> dict:
     except requests.exceptions.RequestException as e:
         raise Exception(f"Request failed: {str(e)}")
 
-def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]) -> Dict[str, Any]:
+def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]) -> int:
     """
-    Calculate detailed performance metrics and scores based on timing and response characteristics.
-    Returns a dictionary with scores and detailed analysis.
+    Calculate a performance score based on timing metrics and response characteristics.
+    Returns a score from 0-100.
     """
     score = 100
-    analysis = {
-        'total_score': 100,  # Initialize total score
-        'bottlenecks': [],
-        'metrics': {
-            'ttfb': '0ms',
-            'network_latency': '0ms',
-            'dns_time': '0ms',
-            'tls_time': '0ms',
-            'total_time': '0ms'
-        },
-        'optimization_opportunities': [],
-        'scores': {
-            'total': 100,
-            'ttfb': 100,
-            'network': 100,
-            'optimization': 100
-        }
-    }
+    total_time = float(timing.get('total_time', 0))
     
-    # Calculate TTFB (Time To First Byte)
-    try:
-        def extract_ms_value(value):
-            if isinstance(value, (int, float)):
-                return float(value)
-            if isinstance(value, str):
-                return float(value.replace('ms', ''))
-            return 0.0
-
-        dns_lookup_time = extract_ms_value(timing.get('dns_lookup', 0))
-        connect_time = extract_ms_value(timing.get('connect_time', 0))
-        ttfb = dns_lookup_time + connect_time
-
-        if 'tls_handshake' in timing:
-            ttfb += extract_ms_value(timing['tls_handshake'])
-        
-        analysis['metrics']['ttfb'] = f"{ttfb:.2f}ms"
-        
-        # Time-based scoring
-        total_time = extract_ms_value(timing.get('total_time', 0))
-        analysis['metrics']['total_time'] = f"{total_time:.2f}ms"
-        
-        # Network latency calculation
-        latency = connect_time - dns_lookup_time if connect_time > dns_lookup_time else 0
-        
-        analysis['metrics']['network_latency'] = f"{latency:.2f}ms"
-        analysis['metrics']['dns_time'] = f"{dns_time:.2f}ms"
-        
-        if 'tls_handshake' in timing:
-            tls_time = float(timing['tls_handshake'].replace('ms', '') if isinstance(timing['tls_handshake'], str) else timing['tls_handshake'])
-            analysis['metrics']['tls_time'] = f"{tls_time:.2f}ms"
-    except (ValueError, TypeError) as e:
-        # If any conversion fails, keep the default values
-        pass
-    
+    # Time-based scoring
     if total_time > 3000:  # More than 3 seconds
         score -= 30
-        analysis['bottlenecks'].append("High total response time")
     elif total_time > 1000:  # More than 1 second
         score -= 15
-        analysis['optimization_opportunities'].append("Response time optimization needed")
     elif total_time > 500:  # More than 500ms
         score -= 5
-        analysis['optimization_opportunities'].append("Minor response time improvements possible")
     
-    # DNS lookup analysis
-    dns_time = extract_ms_value(timing.get('dns_lookup', 0))
-    analysis['metrics']['dns_time'] = f"{dns_time:.2f}ms"
-    
+    # DNS lookup scoring
+    dns_time = float(timing.get('dns_lookup', 0))
     if dns_time > 500:
         score -= 10
-        analysis['bottlenecks'].append("Slow DNS resolution")
     elif dns_time > 200:
         score -= 5
-        analysis['optimization_opportunities'].append("DNS resolution optimization recommended")
     
-    # Network latency analysis
-    latency = extract_ms_value(timing.get('connect_time', 0)) - dns_time
-    analysis['metrics']['network_latency'] = f"{latency:.2f}ms"
-    
-    if latency > 200:
-        score -= 10
-        analysis['bottlenecks'].append("High network latency")
-        analysis['optimization_opportunities'].append("Consider using a CDN or closer server location")
-    
-    # TLS analysis
+    # Connection and TLS scoring
     if 'tls_handshake' in timing:
-        tls_time = extract_ms_value(timing['tls_handshake'])
-        analysis['metrics']['tls_time'] = f"{tls_time:.2f}ms"
-        
+        tls_time = float(timing['tls_handshake'])
         if tls_time > 300:
             score -= 10
-            analysis['bottlenecks'].append("Slow TLS handshake")
-            analysis['optimization_opportunities'].append("Enable TLS session resumption")
         elif tls_time > 100:
             score -= 5
-            analysis['optimization_opportunities'].append("TLS optimization possible")
     
-    # Response optimization analysis
+    # Response optimization scoring
     if not metrics.get('is_compressed', False):
         score -= 10
-        analysis['optimization_opportunities'].append("Enable response compression")
-    
     if not metrics.get('connection_reused', False):
         score -= 5
-        analysis['optimization_opportunities'].append("Implement connection reuse")
     
-    # Response size analysis
+    # Response size scoring
     response_size = metrics.get('response_size', 0)
     if response_size > 5_000_000:  # 5MB
         score -= 15
-        analysis['bottlenecks'].append("Large response size")
-        analysis['optimization_opportunities'].append("Implement pagination or response size limits")
     elif response_size > 1_000_000:  # 1MB
         score -= 5
-        analysis['optimization_opportunities'].append("Consider response size optimization")
     
-    # Calculate performance grade
-    analysis['scores']['total'] = max(0, score)
-    analysis['scores']['ttfb'] = 100 - (ttfb / 10 if ttfb < 1000 else 100)
-    analysis['scores']['network'] = 100 - (latency / 2 if latency < 200 else 100)
-    analysis['scores']['optimization'] = 100 if metrics.get('is_compressed', False) and metrics.get('connection_reused', False) else 50
-    
-    return analysis
+    return max(0, score)  # Ensure score doesn't go below 0
 
 def _generate_performance_recommendations(timing: Dict[str, Any], metrics: Dict[str, Any]) -> List[str]:
     """
