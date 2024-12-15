@@ -149,20 +149,28 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
     
     # Calculate TTFB (Time To First Byte)
     try:
-        ttfb = float(timing.get('dns_lookup', '0').replace('ms', '')) + float(timing.get('connect_time', '0').replace('ms', ''))
+        def extract_ms_value(value):
+            if isinstance(value, (int, float)):
+                return float(value)
+            if isinstance(value, str):
+                return float(value.replace('ms', ''))
+            return 0.0
+
+        dns_lookup_time = extract_ms_value(timing.get('dns_lookup', 0))
+        connect_time = extract_ms_value(timing.get('connect_time', 0))
+        ttfb = dns_lookup_time + connect_time
+
         if 'tls_handshake' in timing:
-            ttfb += float(timing['tls_handshake'].replace('ms', '') if isinstance(timing['tls_handshake'], str) else timing['tls_handshake'])
+            ttfb += extract_ms_value(timing['tls_handshake'])
         
         analysis['metrics']['ttfb'] = f"{ttfb:.2f}ms"
         
         # Time-based scoring
-        total_time = float(timing.get('total_time', '0').replace('ms', ''))
+        total_time = extract_ms_value(timing.get('total_time', 0))
         analysis['metrics']['total_time'] = f"{total_time:.2f}ms"
         
         # Network latency calculation
-        dns_time = float(timing.get('dns_lookup', '0').replace('ms', ''))
-        connect_time = float(timing.get('connect_time', '0').replace('ms', ''))
-        latency = connect_time - dns_time if connect_time > dns_time else 0
+        latency = connect_time - dns_lookup_time if connect_time > dns_lookup_time else 0
         
         analysis['metrics']['network_latency'] = f"{latency:.2f}ms"
         analysis['metrics']['dns_time'] = f"{dns_time:.2f}ms"
@@ -185,7 +193,7 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
         analysis['optimization_opportunities'].append("Minor response time improvements possible")
     
     # DNS lookup analysis
-    dns_time = float(timing.get('dns_lookup', 0))
+    dns_time = extract_ms_value(timing.get('dns_lookup', 0))
     analysis['metrics']['dns_time'] = f"{dns_time:.2f}ms"
     
     if dns_time > 500:
@@ -196,7 +204,7 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
         analysis['optimization_opportunities'].append("DNS resolution optimization recommended")
     
     # Network latency analysis
-    latency = float(timing.get('connect_time', 0)) - dns_time
+    latency = extract_ms_value(timing.get('connect_time', 0)) - dns_time
     analysis['metrics']['network_latency'] = f"{latency:.2f}ms"
     
     if latency > 200:
@@ -206,7 +214,7 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
     
     # TLS analysis
     if 'tls_handshake' in timing:
-        tls_time = float(timing['tls_handshake'])
+        tls_time = extract_ms_value(timing['tls_handshake'])
         analysis['metrics']['tls_time'] = f"{tls_time:.2f}ms"
         
         if tls_time > 300:
