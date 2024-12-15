@@ -129,10 +129,16 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
     """
     score = 100
     analysis = {
-        'scores': {},
+        'total_score': 100,  # Initialize total score
         'bottlenecks': [],
         'metrics': {},
-        'optimization_opportunities': []
+        'optimization_opportunities': [],
+        'scores': {
+            'total': 100,
+            'ttfb': 100,
+            'network': 100,
+            'optimization': 100
+        }
     }
     
     # Calculate TTFB (Time To First Byte)
@@ -209,12 +215,10 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
         analysis['optimization_opportunities'].append("Consider response size optimization")
     
     # Calculate performance grade
-    analysis['scores'] = {
-        'total': max(0, score),
-        'ttfb': 100 - (ttfb / 10 if ttfb < 1000 else 100),
-        'network': 100 - (latency / 2 if latency < 200 else 100),
-        'optimization': 100 if metrics.get('is_compressed', False) and metrics.get('connection_reused', False) else 50
-    }
+    analysis['scores']['total'] = max(0, score)
+    analysis['scores']['ttfb'] = 100 - (ttfb / 10 if ttfb < 1000 else 100)
+    analysis['scores']['network'] = 100 - (latency / 2 if latency < 200 else 100)
+    analysis['scores']['optimization'] = 100 if metrics.get('is_compressed', False) and metrics.get('connection_reused', False) else 50
     
     return analysis
 

@@ -401,14 +401,17 @@ def analyze_request_view():
                     
                     # Display various performance scores
                     score_cols = st.columns(4)
+                    scores = perf_metrics.get('scores', {})
                     with score_cols[0]:
-                        st.metric("Overall Score", f"{perf_metrics['scores']['total']}/100")
+                        st.metric("Overall Score", f"{scores.get('total', 'N/A')}/100")
                     with score_cols[1]:
-                        st.metric("TTFB Score", f"{perf_metrics['scores']['ttfb']:.1f}/100")
+                        ttfb_score = scores.get('ttfb', 0)
+                        st.metric("TTFB Score", f"{ttfb_score:.1f}/100" if isinstance(ttfb_score, (int, float)) else "N/A")
                     with score_cols[2]:
-                        st.metric("Network Score", f"{perf_metrics['scores']['network']:.1f}/100")
+                        network_score = scores.get('network', 0)
+                        st.metric("Network Score", f"{network_score:.1f}/100" if isinstance(network_score, (int, float)) else "N/A")
                     with score_cols[3]:
-                        st.metric("Optimization Score", f"{perf_metrics['scores']['optimization']}/100")
+                        st.metric("Optimization Score", f"{scores.get('optimization', 'N/A')}/100")
                     
                     # Detailed Metrics
                     st.markdown("#### 📊 Detailed Metrics")
