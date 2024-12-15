@@ -1,4 +1,7 @@
 import requests
+import json
+import re
+import xml.dom.minidom
 from urllib.parse import urlparse
 
 def analyze_request(request_data: dict) -> dict:
