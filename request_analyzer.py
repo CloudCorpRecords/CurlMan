@@ -2,7 +2,10 @@ import requests
 import json
 import re
 import xml.dom.minidom
+import time
+from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
+from collections import defaultdict
 
 def analyze_request(request_data: dict) -> dict:
     """
@@ -90,30 +93,60 @@ def _analyze_request_headers(headers: dict) -> dict:
         "x-csrf-token": {
             "present": "x-csrf-token" in headers_lower,
             "description": "Prevents Cross-Site Request Forgery attacks",
-            "recommendation": "Add X-CSRF-Token header for forms/mutations"
+            "recommendation": "Add X-CSRF-Token header for forms/mutations",
+            "risk_level": "high"
         },
         "x-xss-protection": {
             "present": "x-xss-protection" in headers_lower,
             "valid": headers_lower.get("x-xss-protection", "") in ["1", "1; mode=block"],
             "description": "Provides XSS filtering capabilities",
-            "recommendation": "Set X-XSS-Protection: 1; mode=block"
+            "recommendation": "Set X-XSS-Protection: 1; mode=block",
+            "risk_level": "medium"
         },
         "x-content-type-options": {
             "present": "x-content-type-options" in headers_lower,
             "valid": headers_lower.get("x-content-type-options", "").lower() == "nosniff",
             "description": "Prevents MIME type sniffing",
-            "recommendation": "Set X-Content-Type-Options: nosniff"
+            "recommendation": "Set X-Content-Type-Options: nosniff",
+            "risk_level": "medium"
         },
         "strict-transport-security": {
             "present": "strict-transport-security" in headers_lower,
+            "valid": bool(re.search(r'max-age=\d+', headers_lower.get("strict-transport-security", ""))),
             "description": "Enforces HTTPS connections",
-            "recommendation": "Add Strict-Transport-Security header with appropriate max-age"
+            "recommendation": "Add Strict-Transport-Security header with appropriate max-age",
+            "risk_level": "high"
         },
         "x-frame-options": {
             "present": "x-frame-options" in headers_lower,
             "valid": headers_lower.get("x-frame-options", "").upper() in ["DENY", "SAMEORIGIN"],
             "description": "Prevents clickjacking attacks",
-            "recommendation": "Set X-Frame-Options to DENY or SAMEORIGIN"
+            "recommendation": "Set X-Frame-Options to DENY or SAMEORIGIN",
+            "risk_level": "medium"
+        },
+        "permissions-policy": {
+            "present": "permissions-policy" in headers_lower,
+            "description": "Controls browser features and APIs",
+            "recommendation": "Implement Permissions-Policy to restrict unwanted features",
+            "risk_level": "medium"
+        },
+        "content-security-policy": {
+            "present": "content-security-policy" in headers_lower,
+            "valid": bool(headers_lower.get("content-security-policy", "")),
+            "description": "Prevents various types of attacks including XSS",
+            "recommendation": "Implement a strict Content-Security-Policy",
+            "risk_level": "high"
+        },
+        "referrer-policy": {
+            "present": "referrer-policy" in headers_lower,
+            "valid": headers_lower.get("referrer-policy", "").lower() in [
+                "no-referrer", "no-referrer-when-downgrade", "origin",
+                "origin-when-cross-origin", "same-origin", "strict-origin",
+                "strict-origin-when-cross-origin", "unsafe-url"
+            ],
+            "description": "Controls how much referrer information should be included",
+            "recommendation": "Set appropriate Referrer-Policy header",
+            "risk_level": "low"
         }
     }
 
@@ -122,13 +155,27 @@ def _analyze_request_headers(headers: dict) -> dict:
             "present": "content-type" in headers_lower,
             "value": headers_lower.get("content-type", ""),
             "valid": bool(headers_lower.get("content-type", "")),
-            "recommendation": "Specify Content-Type header"
+            "recommendation": "Specify Content-Type header",
+            "details": _analyze_content_type(headers_lower.get("content-type", ""))
         },
         "accept": {
             "present": "accept" in headers_lower,
             "value": headers_lower.get("accept", ""),
             "valid": bool(headers_lower.get("accept", "")),
-            "recommendation": "Specify Accept header for expected response format"
+            "recommendation": "Specify Accept header for expected response format",
+            "details": _analyze_accept_header(headers_lower.get("accept", ""))
+        },
+        "encoding": {
+            "present": "accept-encoding" in headers_lower,
+            "value": headers_lower.get("accept-encoding", ""),
+            "recommendation": "Enable content compression by specifying Accept-Encoding",
+            "details": _analyze_encoding(headers_lower.get("accept-encoding", ""))
+        },
+        "language": {
+            "present": "accept-language" in headers_lower,
+            "value": headers_lower.get("accept-language", ""),
+            "recommendation": "Specify Accept-Language for localization",
+            "details": _analyze_language(headers_lower.get("accept-language", ""))
         }
     }
 
@@ -184,6 +231,63 @@ def _analyze_request_body(data: str) -> dict:
             "size_warning": len(data) > 1000000,  # Warning for payloads > 1MB
             "recommendations": []
         }
+    }
+def _analyze_content_type(content_type: str) -> Dict[str, Any]:
+    """Analyze Content-Type header for validity and security implications."""
+    if not content_type:
+        return {"valid": False, "message": "Content-Type not specified"}
+    
+    content_type_lower = content_type.lower()
+    charset_match = re.search(r'charset=([\w-]+)', content_type_lower)
+    
+    return {
+        "valid": True,
+        "mime_type": content_type_lower.split(';')[0].strip(),
+        "charset": charset_match.group(1) if charset_match else None,
+        "security_implications": {
+            "xss_risk": "text/html" in content_type_lower or "application/javascript" in content_type_lower,
+            "injection_risk": "application/x-www-form-urlencoded" in content_type_lower
+        }
+    }
+
+def _analyze_accept_header(accept: str) -> Dict[str, Any]:
+    """Analyze Accept header for validity and content negotiation capabilities."""
+    if not accept:
+        return {"valid": False, "message": "Accept header not specified"}
+    
+    types = [t.strip() for t in accept.split(',')]
+    return {
+        "valid": True,
+        "types": types,
+        "allows_any": "*/*" in types,
+        "preferences": [t for t in types if t != '*/*']
+    }
+
+def _analyze_encoding(encoding: str) -> Dict[str, Any]:
+    """Analyze Accept-Encoding header for compression support."""
+    if not encoding:
+        return {"valid": False, "message": "Accept-Encoding not specified"}
+    
+    encodings = [e.strip() for e in encoding.split(',')]
+    return {
+        "valid": True,
+        "supports_gzip": "gzip" in encodings,
+        "supports_br": "br" in encodings,
+        "supports_deflate": "deflate" in encodings,
+        "optimization_score": len(encodings) * 25  # Score out of 100
+    }
+
+def _analyze_language(language: str) -> Dict[str, Any]:
+    """Analyze Accept-Language header for localization support."""
+    if not language:
+        return {"valid": False, "message": "Accept-Language not specified"}
+    
+    languages = [l.strip() for l in language.split(',')]
+    return {
+        "valid": True,
+        "languages": languages,
+        "has_weights": bool(re.search(r'q=\d*\.?\d+', language)),
+        "primary_language": languages[0].split(';')[0] if languages else None
     }
 
 def _check_sensitive_content(content: str) -> bool:
