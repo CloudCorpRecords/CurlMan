@@ -131,8 +131,7 @@ def _check_sensitive_content(content: str) -> bool:
         r'\b\d{3}[-]?\d{2}[-]?\d{4}\b',  # SSN-like patterns
         r'(?i)\b(password|secret|key|token|auth)\b'  # Sensitive keywords
     ]
-    return any(re.search(pattern, content) for pattern in re.compile(pattern) 
-              for pattern in sensitive_patterns)
+    return any(re.search(pattern, content) for pattern in sensitive_patterns)
 
 def _calculate_security_score(analysis: dict) -> dict:
     """Calculate overall security score and provide recommendations."""
