@@ -369,48 +369,126 @@ def analyze_request_view():
                             st.info(f"💡 {rec}")
                 
                 with tab2:
+                    # Response Details
                     st.subheader("Response Details")
                     
-                    # Response Overview
+                    # Response Overview with Enhanced Metrics
                     st.markdown("### 📊 Response Overview")
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Status Code", response_info['status_code'])
-                    with col2:
+                    overview_cols = st.columns(4)
+                    with overview_cols[0]:
+                        status_color = "🟢" if 200 <= response_info['status_code'] < 300 else "🟡" if response_info['status_code'] < 500 else "🔴"
+                        st.metric("Status Code", f"{status_color} {response_info['status_code']}")
+                    with overview_cols[1]:
                         st.metric("Response Size", response_info['metadata']['size'])
-                    with col3:
-                        st.metric("Total Time", response_info['metadata']['timing']['total_time'])
+                    with overview_cols[2]:
+                        total_time = float(response_info['metadata']['timing']['total_time'].replace('ms', ''))
+                        time_indicator = "🟢" if total_time < 500 else "🟡" if total_time < 1000 else "🔴"
+                        st.metric("Total Time", f"{time_indicator} {response_info['metadata']['timing']['total_time']}")
+                    with overview_cols[3]:
+                        st.metric("Content Encoding", response_info['metadata'].get('encoding', 'None'))
                     
-                    # Timing Metrics
-                    st.markdown("### ⏱️ Timing Analysis")
+                    # Detailed Timing Analysis
+                    st.markdown("### ⏱️ Response Timeline")
                     timing_data = response_info['metadata']['timing']
-                    timing_cols = st.columns(3)
-                    with timing_cols[0]:
-                        st.metric("DNS Lookup", timing_data.get('dns_lookup', 'N/A'))
-                        st.metric("Connect Time", timing_data.get('connect_time', 'N/A'))
-                    with timing_cols[1]:
-                        st.metric("TLS Handshake", timing_data.get('tls_handshake', 'N/A'))
-                        st.metric("Request Time", timing_data.get('request_time', 'N/A'))
-                    with timing_cols[2]:
-                        st.metric("Processing Time", timing_data.get('processing_time', 'N/A'))
-                        st.metric("Server Time", timing_data.get('server_time', 'N/A'))
                     
-                    # Performance Metrics
+                    # Create a timeline visualization
+                    timeline_data = {
+                        "DNS Lookup": float(timing_data.get('dns_lookup', '0ms').replace('ms', '')),
+                        "TCP Connect": float(timing_data.get('connect_time', '0ms').replace('ms', '')),
+                        "TLS Handshake": float(timing_data.get('tls_handshake', '0ms').replace('ms', '')) if timing_data.get('tls_handshake') else 0,
+                        "Server Processing": float(timing_data.get('processing_time', '0ms').replace('ms', '')),
+                        "Content Transfer": float(timing_data.get('request_time', '0ms').replace('ms', ''))
+                    }
+                    
+                    # Display timeline metrics with performance indicators
+                    timeline_cols = st.columns(len(timeline_data))
+                    for idx, (phase, time) in enumerate(timeline_data.items()):
+                        with timeline_cols[idx]:
+                            indicator = "🟢" if time < 100 else "🟡" if time < 300 else "🔴"
+                            st.metric(
+                                phase,
+                                f"{indicator} {time:.1f}ms",
+                                help=f"Target: <100ms 🟢, <300ms 🟡, >300ms 🔴"
+                            )
+                    
+                    # Detailed Server Timing
+                    if 'server_time' in timing_data:
+                        st.markdown("#### 🖥️ Server-side Timing")
+                        server_time = str(timing_data['server_time'])
+                        st.info(f"Server processing time: {server_time}")
+                    
+                    # Enhanced Performance Metrics
                     st.markdown("### 🚀 Performance Analysis")
                     perf_metrics = response_info['metadata']['performance_metrics']
-                    st.metric("Performance Score", f"{perf_metrics['total_score']}/100")
                     
-                    # Performance Details
-                    perf_cols = st.columns(3)
+                    # Performance Score with detailed breakdown
+                    score_cols = st.columns([2, 3])
+                    with score_cols[0]:
+                        score = perf_metrics['total_score']
+                        score_color = "🟢" if score >= 90 else "🟡" if score >= 70 else "🔴"
+                        st.metric(
+                            "Performance Score",
+                            f"{score_color} {score}/100",
+                            help="90+ 🟢 Excellent, 70-89 🟡 Good, <70 🔴 Needs Improvement"
+                        )
+                    with score_cols[1]:
+                        st.markdown("#### Score Breakdown")
+                        st.progress(score/100)
+                        st.caption(f"Based on response time, compression, caching, and optimization metrics")
+                    
+                    # Detailed Performance Metrics
+                    st.markdown("#### Key Performance Indicators")
+                    perf_cols = st.columns(4)
+                    
                     with perf_cols[0]:
-                        st.markdown("**Compression:**")
-                        st.markdown("✅" if perf_metrics['compression_enabled'] else "❌")
+                        compression_status = "✅ Enabled" if perf_metrics['compression_enabled'] else "❌ Disabled"
+                        st.metric(
+                            "Compression",
+                            compression_status,
+                            delta="Optimal" if perf_metrics['compression_enabled'] else "Improvement needed",
+                            delta_color="normal" if perf_metrics['compression_enabled'] else "inverse"
+                        )
+                        
                     with perf_cols[1]:
-                        st.markdown("**Connection Reused:**")
-                        st.markdown("✅" if perf_metrics['connection_reused'] else "❌")
+                        connection_status = "✅ Reused" if perf_metrics['connection_reused'] else "❌ New Connection"
+                        st.metric(
+                            "Connection",
+                            connection_status,
+                            delta="Optimal" if perf_metrics['connection_reused'] else "Could be improved",
+                            delta_color="normal" if perf_metrics['connection_reused'] else "inverse"
+                        )
+                        
                     with perf_cols[2]:
-                        st.markdown("**Response Size:**")
-                        st.markdown(perf_metrics['response_size'])
+                        size = perf_metrics['response_size']
+                        size_status = "🟢" if 'KB' in size and float(size.split()[0]) < 500 else "🟡" if 'KB' in size else "🔴"
+                        st.metric(
+                            "Response Size",
+                            f"{size_status} {size}",
+                            help="🟢 <500KB, 🟡 500KB-1MB, 🔴 >1MB"
+                        )
+                        
+                    with perf_cols[3]:
+                        cache_status = "✅" if response_info['headers'].get('cache-control') else "❌"
+                        st.metric(
+                            "Caching",
+                            f"{cache_status} {'Configured' if cache_status == '✅' else 'Not Configured'}",
+                            delta="Optimal" if cache_status == '✅' else "Add caching",
+                            delta_color="normal" if cache_status == '✅' else "inverse"
+                        )
+                    
+                    # Performance Recommendations with Explanations
+                    if perf_metrics.get('recommendations'):
+                        st.markdown("#### 💡 Performance Optimization Suggestions")
+                        for idx, rec in enumerate(perf_metrics['recommendations'], 1):
+                            with st.expander(f"Recommendation {idx}"):
+                                st.markdown(f"**{rec}**")
+                                # Add specific guidance based on the recommendation
+                                if "caching" in rec.lower():
+                                    st.info("Implement cache headers with appropriate max-age values to reduce server load")
+                                elif "compression" in rec.lower():
+                                    st.info("Enable gzip or Brotli compression to reduce transfer sizes")
+                                elif "connection" in rec.lower():
+                                    st.info("Use keep-alive connections to reduce connection overhead")
                     
                     # Performance Recommendations
                     if perf_metrics.get('recommendations'):
