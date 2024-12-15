@@ -131,7 +131,13 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
     analysis = {
         'total_score': 100,  # Initialize total score
         'bottlenecks': [],
-        'metrics': {},
+        'metrics': {
+            'ttfb': '0ms',
+            'network_latency': '0ms',
+            'dns_time': '0ms',
+            'tls_time': '0ms',
+            'total_time': '0ms'
+        },
         'optimization_opportunities': [],
         'scores': {
             'total': 100,
@@ -142,15 +148,31 @@ def _calculate_performance_score(timing: Dict[str, Any], metrics: Dict[str, Any]
     }
     
     # Calculate TTFB (Time To First Byte)
-    ttfb = float(timing.get('dns_lookup', 0)) + float(timing.get('connect_time', 0))
-    if 'tls_handshake' in timing:
-        ttfb += float(timing['tls_handshake'])
-    
-    analysis['metrics']['ttfb'] = f"{ttfb:.2f}ms"
-    
-    # Time-based scoring
-    total_time = float(timing.get('total_time', 0))
-    analysis['metrics']['total_time'] = f"{total_time:.2f}ms"
+    try:
+        ttfb = float(timing.get('dns_lookup', '0').replace('ms', '')) + float(timing.get('connect_time', '0').replace('ms', ''))
+        if 'tls_handshake' in timing:
+            ttfb += float(timing['tls_handshake'].replace('ms', '') if isinstance(timing['tls_handshake'], str) else timing['tls_handshake'])
+        
+        analysis['metrics']['ttfb'] = f"{ttfb:.2f}ms"
+        
+        # Time-based scoring
+        total_time = float(timing.get('total_time', '0').replace('ms', ''))
+        analysis['metrics']['total_time'] = f"{total_time:.2f}ms"
+        
+        # Network latency calculation
+        dns_time = float(timing.get('dns_lookup', '0').replace('ms', ''))
+        connect_time = float(timing.get('connect_time', '0').replace('ms', ''))
+        latency = connect_time - dns_time if connect_time > dns_time else 0
+        
+        analysis['metrics']['network_latency'] = f"{latency:.2f}ms"
+        analysis['metrics']['dns_time'] = f"{dns_time:.2f}ms"
+        
+        if 'tls_handshake' in timing:
+            tls_time = float(timing['tls_handshake'].replace('ms', '') if isinstance(timing['tls_handshake'], str) else timing['tls_handshake'])
+            analysis['metrics']['tls_time'] = f"{tls_time:.2f}ms"
+    except (ValueError, TypeError) as e:
+        # If any conversion fails, keep the default values
+        pass
     
     if total_time > 3000:  # More than 3 seconds
         score -= 30
